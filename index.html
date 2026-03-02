@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PieceOut - CNC Cut Preview</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>PieceOut</h1>
+            <div id="toolbar">
+                <button id="btn-wireframe" class="toolbar-btn active" title="Wireframe view (W)">Wireframe</button>
+                <button id="btn-preview" class="toolbar-btn" title="Cut preview (F)">Preview</button>
+                <span class="separator"></span>
+                <button id="btn-zoom-in" class="toolbar-btn" title="Zoom in (+)">+</button>
+                <button id="btn-zoom-out" class="toolbar-btn" title="Zoom out (-)">-</button>
+                <button id="btn-zoom-fit" class="toolbar-btn" title="Fit to view (0)">Fit</button>
+                <span class="separator"></span>
+                <button id="btn-export-png" class="toolbar-btn" title="Export as PNG">Export PNG</button>
+                <span class="separator"></span>
+                <label id="bg-toggle" title="Toggle background">
+                    <span>BG:</span>
+                    <select id="bg-select">
+                        <option value="dark">Dark</option>
+                        <option value="light">Light</option>
+                        <option value="checkerboard">Checker</option>
+                    </select>
+                </label>
+            </div>
+        </header>
+
+        <div id="main">
+            <aside id="sidebar">
+                <div id="sidebar-header">
+                    <h2>Layers</h2>
+                    <div id="layer-actions">
+                        <button id="btn-all-cut" class="small-btn" title="Tag all as cut-through">All Cut</button>
+                        <button id="btn-all-ignore" class="small-btn" title="Tag all as ignore">All Ignore</button>
+                        <button id="btn-clear-tags" class="small-btn" title="Reset to auto-detect">Auto</button>
+                    </div>
+                </div>
+                <div id="layer-list">
+                    <p class="hint">Drop an SVG to see layers</p>
+                </div>
+                <div id="material-settings">
+                    <h3>Material</h3>
+                    <label>Color: <input type="color" id="material-color" value="#C4A265"></label>
+                </div>
+            </aside>
+
+            <div id="viewport-container">
+                <div id="drop-zone" class="visible">
+                    <div id="drop-zone-content">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        <p>Drop SVG file here</p>
+                        <p class="sub">or click to browse</p>
+                        <input type="file" id="file-input" accept=".svg" hidden>
+                    </div>
+                </div>
+                <div id="viewport">
+                    <svg id="svg-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     width="600" height="400" viewBox="0 0 600 400">
+
+  <!-- Simulates a Vectric export with named layers -->
+
+  <g id="Profile Cut" inkscape:label="Profile Cut">
+    <!-- Outer border cut -->
+    <rect x="10" y="10" width="580" height="380" fill="none" stroke="red" stroke-width="0.5" rx="5"/>
+
+    <!-- Star cutout -->
+    <polygon points="300,50 320,120 390,120 335,160 355,230 300,190 245,230 265,160 210,120 280,120"
+             fill="none" stroke="red" stroke-width="0.5"/>
+
+    <!-- Circle cutouts -->
+    <circle cx="100" cy="100" r="40" fill="none" stroke="red" stroke-width="0.5"/>
+    <circle cx="500" cy="100" r="40" fill="none" stroke="red" stroke-width="0.5"/>
+    <circle cx="100" cy="300" r="40" fill="none" stroke="red" stroke-width="0.5"/>
+    <circle cx="500" cy="300" r="40" fill="none" stroke="red" stroke-width="0.5"/>
+
+    <!-- Diamond cutouts -->
+    <polygon points="300,280 330,320 300,360 270,320" fill="none" stroke="red" stroke-width="0.5"/>
+
+    <!-- Small lattice holes -->
+    <rect x="160" y="260" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="200" y="260" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="240" y="260" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="330" y="260" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="370" y="260" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="410" y="260" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+
+    <rect x="160" y="300" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="200" y="300" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="240" y="300" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="330" y="300" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="370" y="300" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="410" y="300" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+
+    <rect x="160" y="340" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="200" y="340" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="240" y="340" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="330" y="340" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="370" y="340" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+    <rect x="410" y="340" width="30" height="30" fill="none" stroke="red" stroke-width="0.5"/>
+  </g>
+
+  <g id="Engrave" inkscape:label="Engrave">
+    <!-- Text outlines for engraving -->
+    <rect x="200" y="140" width="200" height="40" fill="none" stroke="blue" stroke-width="0.5" rx="3"/>
+    <line x1="220" y1="160" x2="260" y2="160" stroke="blue" stroke-width="0.5"/>
+    <line x1="280" y1="160" x2="380" y2="160" stroke="blue" stroke-width="0.5"/>
+  </g>
+
+  <g id="Decorative" inkscape:label="Decorative">
+    <!-- Some decorative lines that shouldn't affect the cut -->
+    <line x1="50" y1="200" x2="550" y2="200" stroke="green" stroke-width="0.3"/>
+    <line x1="300" y1="50" x2="300" y2="380" stroke="green" stroke-width="0.3"/>
+  </g>
+</svg>
