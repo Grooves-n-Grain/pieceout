@@ -1,0 +1,20 @@
+# AI assistant project memory — kept out of public repo
+CLAUDE.md
+.claude/
+
+# Demo-video Remotion project — only the rendered landscape MP4 ships in the repo
+demo-video/*
+!demo-video/out/
+demo-video/out/*
+!demo-video/out/pieceout-demo.mp4
+
+# Internal design docs — not for public repo
+docs/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+.vscode/
+.idea/
