@@ -4,11 +4,8 @@
 
 Drop in an SVG (e.g. exported from Vectric), tell PieceOut which layers are profile cuts, pockets, or decoration, and get an instant visual of the finished piece. No install, no build step, runs in your browser.
 
-https://github.com/Grooves-n-Grain/pieceout/raw/main/demo-video/out/pieceout-demo.mp4
+https://github.com/user-attachments/assets/58ff067c-7a4c-46cc-a53a-e39b67bd0832
 
-<sub>▶ <a href="demo-video/out/pieceout-demo.mp4">Watch the demo</a> if the player above doesn't load.</sub>
-
-https://github.com/Grooves-n-Grain/pieceout/raw/main/demo-video/out/pieceout-demo.mp4
 ---
 
 ## What it does
