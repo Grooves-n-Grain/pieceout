@@ -4,7 +4,7 @@
 
 Drop in an SVG (e.g. exported from Vectric), tell PieceOut which layers are profile cuts, pockets, or decoration, and get an instant visual of the finished piece. No install, no build step, runs in your browser.
 
-https://github.com/user-attachments/assets/58ff067c-7a4c-46cc-a53a-e39b67bd0832
+https://github.com/user-attachments/assets/c130e389-b88d-4d8f-9ac2-7147b5733db8
 
 ---
 
