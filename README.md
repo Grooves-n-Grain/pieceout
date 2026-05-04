@@ -8,6 +8,7 @@ https://github.com/Grooves-n-Grain/pieceout/raw/main/demo-video/out/pieceout-dem
 
 <sub>▶ <a href="demo-video/out/pieceout-demo.mp4">Watch the demo</a> if the player above doesn't load.</sub>
 
+https://github.com/Grooves-n-Grain/pieceout/raw/main/demo-video/out/pieceout-demo.mp4
 ---
 
 ## What it does
