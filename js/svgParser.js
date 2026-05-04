@@ -81,9 +81,21 @@ function getPathElements(container) {
 
 /**
  * Get the bounding box of the entire SVG content.
- * Falls back to viewBox or width/height attributes.
+ * If a live canvas element is provided, uses getBBox() for accurate content bounds.
+ * Otherwise falls back to viewBox or width/height attributes.
  */
-export function getSVGBounds(parsedSVG) {
+export function getSVGBounds(parsedSVG, canvasEl) {
+    // Try to get actual rendered content bounds from the live DOM element
+    if (canvasEl) {
+        try {
+            const bbox = canvasEl.getBBox();
+            if (bbox.width > 0 && bbox.height > 0) {
+                return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
+            }
+        } catch (e) {
+            // getBBox can throw if element is not rendered; fall through
+        }
+    }
     if (parsedSVG.viewBox) {
         const parts = parsedSVG.viewBox.split(/[\s,]+/).map(Number);
         if (parts.length === 4) {

@@ -110,9 +110,9 @@ function loadSVGContent(svgText) {
     // Render layer sidebar
     updateLayerList();
 
-    // Set viewport
-    const bounds = getSVGBounds(parsedSVG);
+    // Set viewport — pass canvas for accurate content bounds via getBBox()
     initViewport(canvas);
+    const bounds = getSVGBounds(parsedSVG, canvas);
     setInitialView(bounds);
 
     // Apply current view mode

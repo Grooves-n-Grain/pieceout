@@ -96,15 +96,35 @@ export function initViewport(canvas) {
 export function setInitialView(bounds) {
     // Add some padding
     const pad = Math.max(bounds.width, bounds.height) * 0.05;
+    let vx = bounds.x - pad;
+    let vy = bounds.y - pad;
+    let vw = bounds.width + pad * 2;
+    let vh = bounds.height + pad * 2;
+
+    // Match viewBox aspect ratio to container so content appears centered and fills the view
+    if (canvasEl) {
+        const rect = canvasEl.parentElement.getBoundingClientRect();
+        if (rect.width && rect.height) {
+            const containerAspect = rect.width / rect.height;
+            const contentAspect = vw / vh;
+
+            if (containerAspect > contentAspect) {
+                // Container is wider — expand viewBox width
+                const newWidth = vh * containerAspect;
+                vx -= (newWidth - vw) / 2;
+                vw = newWidth;
+            } else {
+                // Container is taller — expand viewBox height
+                const newHeight = vw / containerAspect;
+                vy -= (newHeight - vh) / 2;
+                vh = newHeight;
+            }
+        }
+    }
+
     viewState = {
-        x: bounds.x - pad,
-        y: bounds.y - pad,
-        width: bounds.width + pad * 2,
-        height: bounds.height + pad * 2,
-        origX: bounds.x - pad,
-        origY: bounds.y - pad,
-        origWidth: bounds.width + pad * 2,
-        origHeight: bounds.height + pad * 2,
+        x: vx, y: vy, width: vw, height: vh,
+        origX: vx, origY: vy, origWidth: vw, origHeight: vh,
     };
     applyViewBox();
 }
