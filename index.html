@@ -10,16 +10,34 @@
     <div id="app">
         <header>
             <h1>PieceOut</h1>
+            <nav id="tabs">
+                <button id="tab-preview" class="tab-btn active" data-tab="preview">Preview</button>
+                <button id="tab-layout" class="tab-btn" data-tab="layout">Layout</button>
+            </nav>
             <div id="toolbar">
-                <button id="btn-wireframe" class="toolbar-btn active" title="Wireframe view (W)">Wireframe</button>
-                <button id="btn-preview" class="toolbar-btn" title="Cut preview (F)">Preview</button>
-                <span class="separator"></span>
+                <span class="preview-only toolbar-group">
+                    <button id="btn-wireframe" class="toolbar-btn active" title="Wireframe view (W)">Wireframe</button>
+                    <button id="btn-preview" class="toolbar-btn" title="Cut preview (F)">Preview</button>
+                    <span class="separator"></span>
+                </span>
                 <button id="btn-zoom-in" class="toolbar-btn" title="Zoom in (+)">+</button>
                 <button id="btn-zoom-out" class="toolbar-btn" title="Zoom out (-)">-</button>
                 <button id="btn-zoom-fit" class="toolbar-btn" title="Fit to view (0)">Fit</button>
                 <span class="separator"></span>
-                <button id="btn-export-png" class="toolbar-btn" title="Export as PNG">Export PNG</button>
-                <span class="separator"></span>
+                <span class="preview-only toolbar-group">
+                    <button id="btn-export-png" class="toolbar-btn" title="Export as PNG">Export PNG</button>
+                    <span class="separator"></span>
+                </span>
+                <span class="layout-only toolbar-group">
+                    <label id="sheet-picker" title="Sheet to display">
+                        <span>Sheet:</span>
+                        <select id="sheet-select"></select>
+                    </label>
+                    <button id="btn-export-sheet" class="toolbar-btn" title="Download this sheet as SVG">Export SVG</button>
+                    <button id="btn-export-all" class="toolbar-btn" title="Download every sheet">Export all</button>
+                    <button id="btn-send-preview" class="toolbar-btn" title="Open this sheet in the Preview tab">Send to Preview</button>
+                    <span class="separator"></span>
+                </span>
                 <label id="bg-toggle" title="Toggle background">
                     <span>BG:</span>
                     <select id="bg-select">
@@ -32,7 +50,7 @@
         </header>
 
         <div id="main">
-            <aside id="sidebar">
+            <aside id="sidebar" class="preview-only">
                 <div id="sidebar-header">
                     <h2>Layers</h2>
                     <div id="layer-actions">
@@ -47,6 +65,34 @@
                 <div id="material-settings">
                     <h3>Material</h3>
                     <label>Color: <input type="color" id="material-color" value="#C4A265"></label>
+                </div>
+            </aside>
+
+            <aside id="layout-sidebar" class="layout-only">
+                <div id="layout-sidebar-header">
+                    <h2>Layout</h2>
+                    <label id="template-picker">
+                        <span>Template:</span>
+                        <select id="template-select"></select>
+                    </label>
+                </div>
+                <div id="layout-form">
+                    <details id="group-lamp" open>
+                        <summary>Lamp</summary>
+                        <div class="param-list"></div>
+                    </details>
+                    <details id="group-derived" open>
+                        <summary>Derived</summary>
+                        <div class="param-list"></div>
+                    </details>
+                    <details id="group-machine">
+                        <summary>Machine &amp; sheets</summary>
+                        <div class="param-list"></div>
+                    </details>
+                    <div id="layout-messages"></div>
+                </div>
+                <div id="layout-footer">
+                    <button id="btn-layout-reset" class="small-btn" title="Reset every input to its default">Reset to defaults</button>
                 </div>
             </aside>
 
