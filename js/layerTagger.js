@@ -9,10 +9,13 @@ export const LayerType = {
     IGNORE: 'ignore',
 };
 
+// Keywords that mark a layer as reference-only (checked first)
+const IGNORE_KEYWORDS = ['guide', 'reference', 'label'];
+
 // Keywords that suggest a layer is a cut-through
 const CUT_KEYWORDS = [
     'profile', 'cut', 'through', 'outline', 'cutout', 'cut-out',
-    'contour', 'outside', 'border', 'perimeter', 'laser',
+    'contour', 'outside', 'border', 'perimeter', 'laser', 'drill',
 ];
 
 const POCKET_KEYWORDS = [
@@ -25,6 +28,9 @@ const POCKET_KEYWORDS = [
 export function detectLayerType(layerName) {
     const lower = layerName.toLowerCase();
 
+    for (const kw of IGNORE_KEYWORDS) {
+        if (lower.includes(kw)) return LayerType.IGNORE;
+    }
     for (const kw of CUT_KEYWORDS) {
         if (lower.includes(kw)) return LayerType.CUT;
     }
@@ -32,7 +38,6 @@ export function detectLayerType(layerName) {
         if (lower.includes(kw)) return LayerType.POCKET;
     }
 
-    // Default: if only one layer, assume it's a cut layer
     return LayerType.IGNORE;
 }
 
