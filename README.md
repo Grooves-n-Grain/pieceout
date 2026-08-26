@@ -15,6 +15,20 @@ https://github.com/user-attachments/assets/58ff067c-7a4c-46cc-a53a-e39b67bd0832
 3. **See the result** — Preview mode renders cut paths punched out of a wood-colored material, with pockets shaded as recessed regions. Wireframe mode shows the raw geometry.
 4. **Export a PNG** of the preview for documentation, client approval, or just remembering what you were planning.
 
+## Layout tab: generate cut files from dimensions
+
+Switch to the **Layout** tab to go the other direction: type in the dimensions of a piece and get true-size, nested SVG cut files back, ready for Vectric Aspire (or any CAM that imports SVG by layer).
+
+The first template is a Japanese Andon-style lamp: half-lapped square frames pinned with dowels, four legs, and basswood panels held by split dowels.
+
+1. Enter the lamp dimensions (outer width, height, stock thickness, rail width, and so on). Derived sizes such as leg length and panel size update live, and any of them can be overridden.
+2. Set your bit diameter, gutter, edge margin, and sheet sizes once. They are remembered.
+3. Parts are nested per material onto sheets. Grain direction is respected: legs and rails never rotate.
+4. **Export SVG** downloads the sheet you are looking at, one file per material per sheet. Layers are named for the operation: `CUT`, `POCKET-6.35mm`, `DRILL-6.2mm`, and `GUIDE` (reference only). Assign one toolpath per layer in Aspire and you are done.
+5. **Send to Preview** drops the sheet into the Preview tab so you can see the cut before you leave the browser.
+
+All geometry is true part geometry. Tool offsets, tabs, and feeds stay in your CAM software where they belong.
+
 ## Why
 
 It was tedious to have to double-click every piece I wanted cut-out in the preview. With really intricate cuts this used to take a lot of time, and if you messed it up, you only had one `undo.` PieceOut gives you the ability to instantly see everything cut out, allowing you to identify any issues.
@@ -50,7 +64,15 @@ Five vanilla JS modules, loaded directly as ES6 modules from `index.html`:
 - **[`js/renderer.js`](js/renderer.js)** — the visualization engine. Preview mode uses an SVG `<mask>` with `fill-rule="evenodd"` to punch CUT paths out of a material rectangle (handles complex outer-with-inner-cutouts geometry correctly). Pocket layers render as a darkened overlay.
 - **[`js/viewport.js`](js/viewport.js)** — zoom/pan via viewBox manipulation. Mouse + touch.
 - **[`js/app.js`](js/app.js)** — orchestrator. State, file upload, view modes, PNG export.
+- **[`js/layout/`](js/layout/)**: the Layout tab. `templates/andonLamp.js` derives parts and joinery from lamp dimensions, `joints/` holds the half-lap and dowel-hole generators, `nest.js` packs parts onto sheets, `svgWriter.js` serialises a sheet to a true-size layered SVG, and `layoutUI.js` / `layoutForm.js` drive the sidebar. Everything below the UI is pure and unit-tested.
 
+## Tests
+
+```bash
+node --test
+```
+
+Uses Node's built-in test runner. The golden SVGs in `tests/fixtures/` are the default lamp's output; regenerate them with `node tests/fixtures/regen.js` after an intentional change to the template, nester, or writer.
 
 ## Contributing
 
