@@ -162,6 +162,15 @@ export function zoomFit() {
     applyViewBox();
 }
 
+/**
+ * Re-apply the current viewState to the canvas's viewBox attribute without
+ * changing it. Needed after something else (e.g. injectSVG) has overwritten
+ * the viewBox, so the existing zoom/pan is not silently lost.
+ */
+export function refreshViewBox() {
+    applyViewBox();
+}
+
 // --- Internal handlers ---
 
 function onWheel(e) {

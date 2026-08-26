@@ -14,7 +14,7 @@ import { renderParamInputs, renderDerived, renderMessages, markInvalid } from '.
 import { parseSVG } from '../svgParser.js';
 import { injectSVG, showWireframe } from '../renderer.js';
 import { createLayerState } from '../layerTagger.js';
-import { setInitialView } from '../viewport.js';
+import { setInitialView, refreshViewBox } from '../viewport.js';
 
 const TEMPLATES = [andonLamp];
 
@@ -27,6 +27,18 @@ function pickKnown(defaults, saved) {
     return out;
 }
 
+function pickOverrides(derivedFields, saved) {
+    const out = {};
+    if (!saved) return out;
+    const validKeys = new Set(derivedFields.map(d => d.key));
+    for (const key of Object.keys(saved)) {
+        if (validKeys.has(key) && typeof saved[key] === 'number' && Number.isFinite(saved[key])) {
+            out[key] = saved[key];
+        }
+    }
+    return out;
+}
+
 export function initLayout({ canvas, onSendToPreview }) {
     const saved = loadLayoutState();
     const template = TEMPLATES.find(t => t.id === saved?.templateId) || TEMPLATES[0];
@@ -34,12 +46,11 @@ export function initLayout({ canvas, onSendToPreview }) {
     const state = {
         template,
         params: pickKnown(template.defaults(), saved?.params),
-        overrides: { ...(saved?.overrides || {}) },
+        overrides: pickOverrides(template.derivedFields, saved?.overrides),
         machine: pickKnown(defaultMachine(), saved?.machine),
         sheets: [],
         svgs: [],
         sheetIndex: 0,
-        hasErrors: false,
         lastShown: null, // `${index}:${w}x${h}` of the sheet last fitted to view
     };
 
@@ -121,6 +132,10 @@ export function initLayout({ canvas, onSendToPreview }) {
         if (key !== state.lastShown) {
             setInitialView({ x: 0, y: 0, width: sheet.width, height: sheet.height });
             state.lastShown = key;
+        } else {
+            // injectSVG overwrote the viewBox from the SVG's own dimensions;
+            // re-apply the current zoom/pan instead of losing it.
+            refreshViewBox();
         }
     }
 
@@ -143,7 +158,6 @@ export function initLayout({ canvas, onSendToPreview }) {
                 hasErrors = true;
             }
         }
-        state.hasErrors = hasErrors;
 
         if (rebuildForm) renderForm(derived);
         else refreshDerivedValues(derived);
