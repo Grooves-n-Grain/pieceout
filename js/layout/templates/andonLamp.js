@@ -6,6 +6,13 @@
  * Every function here is pure. Rail coordinates: length along x, y = 0 is the
  * rail's OUTER edge, top face up. All eight rails are identical; two per frame
  * are flipped at assembly so the laps mate.
+ *
+ * Assembly note: the two rails per frame that need their laps on the bottom
+ * face are flipped END OVER END (rotated about the rail's width axis), never
+ * rolled about the long axis. That keeps the outer edge outward; the panel
+ * holes are symmetric about the rail centre so the hole pattern is unchanged.
+ * Rolling a rail would put the panel holes at `railWidth - panelInset` from
+ * the outer edge instead.
  */
 import { createPart, addRect, Material, Grain, Layer } from '../parts.js';
 import { halfLap } from '../joints/halfLap.js';
@@ -18,8 +25,8 @@ const params = [
     { key: 'overallHeight',     label: 'Overall height',       group: 'lamp', default: 200,  min: 20,  step: 0.5, unit: 'mm' },
     { key: 'stockThickness',    label: 'Stock thickness',      group: 'lamp', default: 12.7, min: 3,   step: 0.1, unit: 'mm' },
     { key: 'railWidth',         label: 'Rail width',           group: 'lamp', default: 25,   min: 5,   step: 0.5, unit: 'mm' },
-    { key: 'legSize',           label: 'Leg size (square)',    group: 'lamp', default: 19,   min: 5,   step: 0.5, unit: 'mm' },
-    { key: 'panelInset',        label: 'Panel inset',          group: 'lamp', default: 8,    min: 1,   step: 0.5, unit: 'mm' },
+    { key: 'legSize',           label: 'Leg size (square)',    group: 'lamp', default: 12.7, min: 5,   step: 0.5, unit: 'mm' },
+    { key: 'panelInset',        label: 'Panel inset',          group: 'lamp', default: 13,   min: 1,   step: 0.5, unit: 'mm' },
     // Recorded for the cut list and future joint types; v1 geometry does not use it.
     { key: 'panelThickness',    label: 'Panel thickness',      group: 'lamp', default: 3.2,  min: 0.5, step: 0.1, unit: 'mm' },
     { key: 'panelClearance',    label: 'Panel clearance',      group: 'lamp', default: 0.5,  min: 0,   step: 0.1, unit: 'mm' },
@@ -65,12 +72,19 @@ function validate(p, d) {
     const warn = (field, message) => msgs.push({ level: 'warn', field, message });
     const r = p.dowelHoleDia / 2;
 
+    for (const def of params) {
+        if (def.key === 'panelClearance' || def.key === 'panelOverlap') continue;
+        if (p[def.key] <= 0) error(def.key, `${def.label} must be a positive number.`);
+    }
+
     if (d.legLength <= 0) error('overallHeight', 'Overall height must exceed two stock thicknesses.');
     if (d.sidePanelWidth <= 0) error('panelInset', 'Panel inset leaves no width for the side panel.');
     if (d.sidePanelHeight <= 0) error('overallHeight', 'Side panel height is zero or negative; increase overall height or panel overlap.');
     if (d.lidSize <= 0) error('railWidth', 'Rail width leaves no opening for the lid.');
     if (d.lapLength * 2 > d.railLength) error('railWidth', 'Half-laps overlap: rail width is more than half the rail length.');
+    if (d.lapLength < p.dowelHoleDia + 2 * MIN_WALL) error('railWidth', 'Half-lap is too short to hold the corner dowel hole.');
     if (d.lapDepth >= p.stockThickness) error('stockThickness', 'Half-lap depth must be less than the stock thickness.');
+    if (d.lapDepth <= 0) error('stockThickness', 'Half-lap depth must be positive; check stock thickness.');
     if (p.panelOverlap > p.stockThickness) error('panelOverlap', 'Panel overlap cannot exceed the stock thickness (the panel would poke out of the frame).');
     if (p.panelInset - r < MIN_WALL || p.panelInset + r > p.railWidth - MIN_WALL) {
         error('panelInset', `Panel dowel hole needs ${MIN_WALL} mm of wood on each side; move the inset or widen the rail.`);
@@ -86,6 +100,9 @@ function validate(p, d) {
     }
     if (p.panelInset < p.legSize) {
         warn('panelInset', 'Panel plane crosses the legs. Either the legs need a groove, or set the inset past the leg size.');
+    }
+    if (p.legSize > p.stockThickness) {
+        warn('legSize', 'Legs will be legSize x stockThickness, not square; rails and legs come from the same slab.');
     }
     return msgs;
 }

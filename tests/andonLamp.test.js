@@ -6,8 +6,8 @@ const params = andonLamp.defaults();
 
 test('defaults match the spec', () => {
     assert.deepEqual(params, {
-        outerWidth: 150, overallHeight: 200, stockThickness: 12.7, railWidth: 25, legSize: 19,
-        panelInset: 8, panelThickness: 3.2, panelClearance: 0.5, panelOverlap: 6,
+        outerWidth: 150, overallHeight: 200, stockThickness: 12.7, railWidth: 25, legSize: 12.7,
+        panelInset: 13, panelThickness: 3.2, panelClearance: 0.5, panelOverlap: 6,
         dowelHoleDia: 6.2, panelDowelsPerRail: 2,
     });
 });
@@ -18,10 +18,10 @@ test('derive computes every derived dimension', () => {
     assert.equal(d.lapLength, 25);
     assert.equal(d.lapDepth, 6.35);
     assert.equal(d.legLength, 200 - 2 * 12.7);
-    assert.equal(d.sidePanelWidth, 150 - 16 - 0.5);
+    assert.equal(d.sidePanelWidth, 150 - 26 - 0.5);
     assert.equal(d.sidePanelHeight, (200 - 25.4) + 12 - 0.5);
     assert.equal(d.lidSize, 150 - 50 - 0.5);
-    assert.deepEqual(d.panelHoleXs.map(x => Math.round(x * 100) / 100), [56.33, 93.67]);
+    assert.deepEqual(d.panelHoleXs.map(x => Math.round(x * 100) / 100), [54.23, 95.77]);
 });
 
 test('derive applies overrides and keeps dependents consistent', () => {
@@ -30,11 +30,25 @@ test('derive applies overrides and keeps dependents consistent', () => {
     assert.equal(d.sidePanelHeight, 180 + 12 - 0.5);
 });
 
-test('validate passes for defaults and flags the leg-crossing warning', () => {
+test('validate passes for defaults with zero messages', () => {
     const d = andonLamp.derive(params);
     const msgs = andonLamp.validate(params, d);
+    assert.deepEqual(msgs, []);
+});
+
+test('validate flags the leg-crossing warning for an explicit panelInset/legSize input', () => {
+    const crossing = { ...params, panelInset: 8, legSize: 19 };
+    const d = andonLamp.derive(crossing);
+    const msgs = andonLamp.validate(crossing, d);
     assert.equal(msgs.filter(m => m.level === 'error').length, 0);
     assert.ok(msgs.some(m => m.level === 'warn' && m.field === 'panelInset'));
+});
+
+test('validate warns when legSize exceeds stockThickness', () => {
+    const wide = { ...params, legSize: 19 };
+    const d = andonLamp.derive(wide);
+    const msgs = andonLamp.validate(wide, d);
+    assert.ok(msgs.some(m => m.level === 'warn' && m.field === 'legSize'));
 });
 
 test('validate errors on impossible geometry', () => {
@@ -76,12 +90,12 @@ test('build produces the full parts list with joinery', () => {
     assert.deepEqual(pockets.map(p => p.shape.x), [0, 125]);
     assert.equal(drills.length, 4);
     assert.deepEqual(drills.map(h => [h.shape.cx, h.shape.cy]).slice(0, 2), [[12.5, 12.5], [137.5, 12.5]]);
-    assert.equal(drills[2].shape.cy, 8);
+    assert.equal(drills[2].shape.cy, 13);
     assert.ok(drills.every(h => h.diameter === 6.2));
 
     const leg = byName['Leg'];
     assert.equal(leg.width, 200 - 25.4);
-    assert.equal(leg.height, 19);
+    assert.equal(leg.height, 12.7);
     assert.equal(leg.features.filter(f => f.layer !== 'GUIDE').length, 0);
 
     const side = byName['Side panel'];
@@ -115,4 +129,21 @@ test('panel dowel hole margin against the half-lap uses a wall clearance, not a 
     const clear = { ...d, panelHoleXs: [29.2] };
     const msgsClear = andonLamp.validate(params, clear);
     assert.equal(msgsClear.filter(m => m.field === 'panelDowelsPerRail').length, 0);
+});
+
+test('validate reports an error for legSize 0 without derive or validate throwing', () => {
+    const zeroLeg = { ...params, legSize: 0 };
+    let d;
+    assert.doesNotThrow(() => { d = andonLamp.derive(zeroLeg); });
+    let msgs;
+    assert.doesNotThrow(() => { msgs = andonLamp.validate(zeroLeg, d); });
+    assert.ok(msgs.some(m => m.level === 'error' && m.field === 'legSize'));
+});
+
+test('validate reports an error for an overridden lapLength too short for the dowel hole', () => {
+    let d;
+    assert.doesNotThrow(() => { d = andonLamp.derive(params, { lapLength: 5 }); });
+    let msgs;
+    assert.doesNotThrow(() => { msgs = andonLamp.validate(params, d); });
+    assert.ok(msgs.some(m => m.level === 'error' && m.field === 'railWidth' && /half-lap is too short/i.test(m.message)));
 });

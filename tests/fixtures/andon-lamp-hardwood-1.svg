@@ -10,43 +10,43 @@
     <text x="18" y="225" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Rail 7</text>
     <text x="18" y="259" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Rail 8</text>
     <text x="18" y="293" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Leg 1</text>
-    <text x="18" y="321" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Leg 2</text>
-    <text x="18" y="349" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Leg 3</text>
-    <text x="18" y="377" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Leg 4</text>
+    <text x="18" y="314.7" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Leg 2</text>
+    <text x="18" y="336.4" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Leg 3</text>
+    <text x="18" y="358.1" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Leg 4</text>
   </g>
   <g id="DRILL-6.2mm" inkscape:label="DRILL-6.2mm" inkscape:groupmode="layer" fill="none" stroke="#f5a623" stroke-width="0.3">
     <circle cx="27.5" cy="27.5" r="3.1"/>
     <circle cx="152.5" cy="27.5" r="3.1"/>
-    <circle cx="71.333" cy="23" r="3.1"/>
-    <circle cx="108.667" cy="23" r="3.1"/>
+    <circle cx="69.233" cy="28" r="3.1"/>
+    <circle cx="110.767" cy="28" r="3.1"/>
     <circle cx="27.5" cy="61.5" r="3.1"/>
     <circle cx="152.5" cy="61.5" r="3.1"/>
-    <circle cx="71.333" cy="57" r="3.1"/>
-    <circle cx="108.667" cy="57" r="3.1"/>
+    <circle cx="69.233" cy="62" r="3.1"/>
+    <circle cx="110.767" cy="62" r="3.1"/>
     <circle cx="27.5" cy="95.5" r="3.1"/>
     <circle cx="152.5" cy="95.5" r="3.1"/>
-    <circle cx="71.333" cy="91" r="3.1"/>
-    <circle cx="108.667" cy="91" r="3.1"/>
+    <circle cx="69.233" cy="96" r="3.1"/>
+    <circle cx="110.767" cy="96" r="3.1"/>
     <circle cx="27.5" cy="129.5" r="3.1"/>
     <circle cx="152.5" cy="129.5" r="3.1"/>
-    <circle cx="71.333" cy="125" r="3.1"/>
-    <circle cx="108.667" cy="125" r="3.1"/>
+    <circle cx="69.233" cy="130" r="3.1"/>
+    <circle cx="110.767" cy="130" r="3.1"/>
     <circle cx="27.5" cy="163.5" r="3.1"/>
     <circle cx="152.5" cy="163.5" r="3.1"/>
-    <circle cx="71.333" cy="159" r="3.1"/>
-    <circle cx="108.667" cy="159" r="3.1"/>
+    <circle cx="69.233" cy="164" r="3.1"/>
+    <circle cx="110.767" cy="164" r="3.1"/>
     <circle cx="27.5" cy="197.5" r="3.1"/>
     <circle cx="152.5" cy="197.5" r="3.1"/>
-    <circle cx="71.333" cy="193" r="3.1"/>
-    <circle cx="108.667" cy="193" r="3.1"/>
+    <circle cx="69.233" cy="198" r="3.1"/>
+    <circle cx="110.767" cy="198" r="3.1"/>
     <circle cx="27.5" cy="231.5" r="3.1"/>
     <circle cx="152.5" cy="231.5" r="3.1"/>
-    <circle cx="71.333" cy="227" r="3.1"/>
-    <circle cx="108.667" cy="227" r="3.1"/>
+    <circle cx="69.233" cy="232" r="3.1"/>
+    <circle cx="110.767" cy="232" r="3.1"/>
     <circle cx="27.5" cy="265.5" r="3.1"/>
     <circle cx="152.5" cy="265.5" r="3.1"/>
-    <circle cx="71.333" cy="261" r="3.1"/>
-    <circle cx="108.667" cy="261" r="3.1"/>
+    <circle cx="69.233" cy="266" r="3.1"/>
+    <circle cx="110.767" cy="266" r="3.1"/>
   </g>
   <g id="POCKET-6.35mm" inkscape:label="POCKET-6.35mm" inkscape:groupmode="layer" fill="none" stroke="#4a9eff" stroke-width="0.3">
     <rect x="15" y="15" width="25" height="25"/>
@@ -75,9 +75,9 @@
     <rect x="15" y="185" width="150" height="25"/>
     <rect x="15" y="219" width="150" height="25"/>
     <rect x="15" y="253" width="150" height="25"/>
-    <rect x="15" y="287" width="174.6" height="19"/>
-    <rect x="15" y="315" width="174.6" height="19"/>
-    <rect x="15" y="343" width="174.6" height="19"/>
-    <rect x="15" y="371" width="174.6" height="19"/>
+    <rect x="15" y="287" width="174.6" height="12.7"/>
+    <rect x="15" y="308.7" width="174.6" height="12.7"/>
+    <rect x="15" y="330.4" width="174.6" height="12.7"/>
+    <rect x="15" y="352.1" width="174.6" height="12.7"/>
   </g>
 </svg>

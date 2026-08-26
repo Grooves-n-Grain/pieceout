@@ -27,6 +27,8 @@ The first template is a Japanese Andon-style lamp: half-lapped square frames pin
 4. **Export SVG** downloads the sheet you are looking at, one file per material per sheet. Layers are named for the operation: `CUT`, `POCKET-6.35mm`, `DRILL-6.2mm`, and `GUIDE` (reference only). Assign one toolpath per layer in Aspire and you are done.
 5. **Send to Preview** drops the sheet into the Preview tab so you can see the cut before you leave the browser.
 
+At assembly, every rail is cut identically, but each frame needs two of its four rails with the half-lap facing the bottom. Flip those rails END OVER END (rotate about the rail's width axis), never roll them about the long axis. Flipping end over end keeps the outer edge outward, and the panel dowel holes are symmetric about the rail centre so the hole pattern still lines up. Rolling a rail about its long axis would put the panel holes at `railWidth - panelInset` from the outer edge instead, which will not match the other rails in the frame.
+
 All geometry is true part geometry. Tool offsets, tabs, and feeds stay in your CAM software where they belong.
 
 ## Why
@@ -57,7 +59,7 @@ Mouse wheel zooms; click-drag pans; pinch + one-finger pan work on touch devices
 
 ## How it works
 
-Five vanilla JS modules, loaded directly as ES6 modules from `index.html`:
+Six vanilla JS modules, loaded directly as ES6 modules from `index.html`:
 
 - **[`js/svgParser.js`](js/svgParser.js)** — DOMParser-based SVG parsing. Extracts layers from `<g>` elements via `inkscape:label` or `id`. Collects all shape primitives (path / polygon / rect / circle / ellipse / line) per layer.
 - **[`js/layerTagger.js`](js/layerTagger.js)** — keyword-based auto-classification with localStorage-persisted overrides.
