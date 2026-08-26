@@ -16,6 +16,12 @@ function assertPositive(value, label) {
     }
 }
 
+function assertNumber(value, label) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`${label} must be a finite number, got ${value}`);
+    }
+}
+
 function assertOneOf(value, allowed, label) {
     if (!Object.values(allowed).includes(value)) {
         throw new Error(`${label} must be one of ${Object.values(allowed).join(', ')}, got ${value}`);
@@ -40,6 +46,8 @@ export function createPart({ name, material, width, height, grain = Grain.ALONG_
 
 export function addRect(part, { layer, x, y, width, height, depth }) {
     assertOneOf(layer, Layer, 'layer');
+    assertNumber(x, 'x');
+    assertNumber(y, 'y');
     assertPositive(width, 'width');
     assertPositive(height, 'height');
     assertInside(part, x, y, x + width, y + height, `rect ${layer}`);
@@ -57,6 +65,8 @@ export function addRect(part, { layer, x, y, width, height, depth }) {
 
 export function addCircle(part, { layer, cx, cy, diameter }) {
     assertOneOf(layer, Layer, 'layer');
+    assertNumber(cx, 'cx');
+    assertNumber(cy, 'cy');
     assertPositive(diameter, 'diameter');
     const r = diameter / 2;
     assertInside(part, cx - r, cy - r, cx + r, cy + r, `circle ${layer}`);
@@ -67,6 +77,8 @@ export function addCircle(part, { layer, cx, cy, diameter }) {
 
 export function addLabel(part, { text, x, y }) {
     if (typeof text !== 'string' || !text) throw new Error('label text is required');
+    assertNumber(x, 'x');
+    assertNumber(y, 'y');
     assertInside(part, x, y, x, y, 'label');
     const feature = { layer: Layer.GUIDE, shape: { kind: 'text', x, y, text } };
     part.features.push(feature);

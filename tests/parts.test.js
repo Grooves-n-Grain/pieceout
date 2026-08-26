@@ -36,6 +36,13 @@ test('addCircle stores diameter and radius', () => {
     assert.throws(() => addCircle(p, { layer: Layer.DRILL, cx: 2, cy: 12.5, diameter: 6.2 }), /outside/);
 });
 
+test('addRect, addCircle, addLabel reject non-numeric position fields', () => {
+    const p = createPart({ name: 'Rail', material: Material.HARDWOOD, width: 150, height: 25 });
+    assert.throws(() => addRect(p, { layer: Layer.POCKET, x: '0', y: 0, width: 25, height: 25, depth: 1 }), /x/);
+    assert.throws(() => addCircle(p, { layer: Layer.DRILL, cx: 12.5, cy: '12.5', diameter: 6.2 }), /cy/);
+    assert.throws(() => addLabel(p, { text: 'Leg', x: 5, y: '12' }), /y/);
+});
+
 test('addLabel is always on GUIDE', () => {
     const p = createPart({ name: 'Leg', material: Material.HARDWOOD, width: 100, height: 19 });
     const f = addLabel(p, { text: 'Leg', x: 5, y: 12 });

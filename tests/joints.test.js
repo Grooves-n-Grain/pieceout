@@ -25,6 +25,10 @@ test('halfLap rejects a bad end or a lap longer than the part', () => {
     assert.throws(() => halfLap(rail(), 'start', { depth: 6, length: 200 }), /outside/);
 });
 
+test('halfLap requires a depth', () => {
+    assert.throws(() => halfLap(rail(), 'start', { length: 25 }), /depth/);
+});
+
 test('dowelHole adds a DRILL circle', () => {
     const p = rail();
     const f = dowelHole(p, { x: 12.5, y: 12.5, diameter: 6.2 });
