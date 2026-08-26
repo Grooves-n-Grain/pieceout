@@ -21,3 +21,6 @@ Thumbs.db
 
 # Subagent-driven-development scratch (ledger, briefs, review packages)
 .superpowers/
+
+# Playwright MCP browser-session output
+.playwright-mcp/
