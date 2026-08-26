@@ -56,8 +56,8 @@ fileInput.addEventListener('change', (e) => {
 const container = document.getElementById('viewport-container');
 
 container.addEventListener('dragover', (e) => {
-    if (activeTab === 'layout') return;
     e.preventDefault();
+    if (activeTab === 'layout') return;
     e.stopPropagation();
     dropZone.classList.add('drag-over');
     if (!dropZone.classList.contains('visible')) {
@@ -66,8 +66,8 @@ container.addEventListener('dragover', (e) => {
 });
 
 container.addEventListener('dragleave', (e) => {
-    if (activeTab === 'layout') return;
     e.preventDefault();
+    if (activeTab === 'layout') return;
     dropZone.classList.remove('drag-over');
     if (parsedSVG) {
         dropZone.classList.remove('visible');
@@ -75,8 +75,8 @@ container.addEventListener('dragleave', (e) => {
 });
 
 container.addEventListener('drop', (e) => {
-    if (activeTab === 'layout') return;
     e.preventDefault();
+    if (activeTab === 'layout') return;
     e.stopPropagation();
     dropZone.classList.remove('drag-over');
 

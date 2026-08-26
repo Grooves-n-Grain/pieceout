@@ -48,13 +48,16 @@ export function injectSVG(parsedSVG, canvasEl) {
 
     const svgEl = parsedSVG.svgElement;
 
-    // Copy viewBox and dimensions
+    // Copy viewBox only; width/height come from CSS so the canvas fills its
+    // container instead of being pinned to the source SVG's physical size.
     const vb = parsedSVG.viewBox;
     if (vb) {
         canvasEl.setAttribute('viewBox', vb);
     } else if (parsedSVG.width && parsedSVG.height) {
         canvasEl.setAttribute('viewBox', `0 0 ${parsedSVG.width} ${parsedSVG.height}`);
     }
+    canvasEl.removeAttribute('width');
+    canvasEl.removeAttribute('height');
 
     // Import all children from the parsed SVG into our canvas
     const imported = document.importNode(svgEl, true);
@@ -64,9 +67,11 @@ export function injectSVG(parsedSVG, canvasEl) {
         canvasEl.appendChild(imported.firstChild);
     }
 
-    // Copy over any namespace attributes (inkscape, etc.)
+    // Copy over any namespace attributes (inkscape, etc.), but never width/height:
+    // CSS drives layout and viewBox drives export.
     for (const attr of svgEl.attributes) {
-        if (attr.name !== 'xmlns' && !canvasEl.hasAttribute(attr.name)) {
+        if (attr.name === 'xmlns' || attr.name === 'width' || attr.name === 'height') continue;
+        if (!canvasEl.hasAttribute(attr.name)) {
             canvasEl.setAttribute(attr.name, attr.value);
         }
     }
