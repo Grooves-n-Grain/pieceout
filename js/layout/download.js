@@ -8,5 +8,7 @@ export function downloadText(filename, text, mime = 'image/svg+xml') {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    // Delay the revoke: some browsers still need the URL after click() returns
+    // to actually start the download, especially for multiple rapid downloads.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

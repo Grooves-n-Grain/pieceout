@@ -43,7 +43,12 @@ function expandCopies(parts) {
     const copies = [];
     for (const part of parts) {
         for (let i = 0; i < part.qty; i++) {
-            copies.push({ ...part, name: part.qty > 1 ? `${part.name} ${i + 1}` : part.name, qty: 1 });
+            copies.push({
+                ...part,
+                name: part.qty > 1 ? `${part.name} ${i + 1}` : part.name,
+                qty: 1,
+                features: [...part.features],
+            });
         }
     }
     return copies;

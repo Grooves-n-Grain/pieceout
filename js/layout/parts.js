@@ -10,7 +10,7 @@ export const Layer = Object.freeze({ CUT: 'CUT', POCKET: 'POCKET', DRILL: 'DRILL
 
 const EPS = 1e-6;
 
-function assertPositive(value, label) {
+export function assertPositive(value, label) {
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
         throw new Error(`${label} must be a positive number, got ${value}`);
     }

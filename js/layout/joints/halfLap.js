@@ -2,13 +2,7 @@
  * End half-lap: a pocket across the full part width at one end, cut from the
  * top face. Two rails lapped at a corner mate when one is flipped at assembly.
  */
-import { addRect, Layer } from '../parts.js';
-
-function assertPositive(value, label) {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-        throw new Error(`${label} must be a positive number, got ${value}`);
-    }
-}
+import { addRect, Layer, assertPositive } from '../parts.js';
 
 export function halfLap(part, end, { depth, length }) {
     if (end !== 'start' && end !== 'end') {
