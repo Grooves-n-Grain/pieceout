@@ -7,7 +7,7 @@
  * rail's OUTER edge, top face up. All eight rails are identical; two per frame
  * are flipped at assembly so the laps mate.
  */
-import { createPart, addRect, addLabel, Material, Grain, Layer } from '../parts.js';
+import { createPart, addRect, Material, Grain, Layer } from '../parts.js';
 import { halfLap } from '../joints/halfLap.js';
 import { dowelHole } from '../joints/dowelHole.js';
 
@@ -90,10 +90,6 @@ function validate(p, d) {
     return msgs;
 }
 
-function labelPos(part) {
-    return { x: 3, y: Math.min(part.height - 3, 6) };
-}
-
 function build(p, d) {
     const rail = createPart({ name: 'Rail', material: Material.HARDWOOD, width: d.railLength, height: p.railWidth, qty: 8 });
     halfLap(rail, 'start', { depth: d.lapDepth, length: d.lapLength });
@@ -103,10 +99,8 @@ function build(p, d) {
     for (const x of d.panelHoleXs) {
         dowelHole(rail, { x, y: p.panelInset, diameter: p.dowelHoleDia });
     }
-    addLabel(rail, { text: 'Rail', ...labelPos(rail) });
 
     const leg = createPart({ name: 'Leg', material: Material.HARDWOOD, width: d.legLength, height: p.legSize, qty: 4 });
-    addLabel(leg, { text: 'Leg', ...labelPos(leg) });
 
     const panel = (name, width, height, qty) => {
         const part = createPart({ name, material: Material.BASSWOOD, width, height, grain: Grain.ANY, qty });
@@ -114,7 +108,6 @@ function build(p, d) {
         if (width - 2 * inset > 0 && height - 2 * inset > 0) {
             addRect(part, { layer: Layer.GUIDE, x: inset, y: inset, width: width - 2 * inset, height: height - 2 * inset });
         }
-        addLabel(part, { text: name, ...labelPos(part) });
         return part;
     };
 
