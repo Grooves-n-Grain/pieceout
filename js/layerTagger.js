@@ -9,8 +9,10 @@ export const LayerType = {
     IGNORE: 'ignore',
 };
 
-// Keywords that mark a layer as reference-only (checked first)
-const IGNORE_KEYWORDS = ['guide', 'reference', 'label'];
+// Layers starting with "guide" are reference-only (checked first). A prefix
+// rule, not substring matching: substrings would reclassify real Vectric
+// layers like "Engrave Labels" or "Reference Cut Line" from pocket/cut to ignore.
+const IGNORE_PREFIXES = ['guide'];
 
 // Keywords that suggest a layer is a cut-through
 const CUT_KEYWORDS = [
@@ -28,8 +30,8 @@ const POCKET_KEYWORDS = [
 export function detectLayerType(layerName) {
     const lower = layerName.toLowerCase();
 
-    for (const kw of IGNORE_KEYWORDS) {
-        if (lower.includes(kw)) return LayerType.IGNORE;
+    for (const prefix of IGNORE_PREFIXES) {
+        if (lower.startsWith(prefix)) return LayerType.IGNORE;
     }
     for (const kw of CUT_KEYWORDS) {
         if (lower.includes(kw)) return LayerType.CUT;
