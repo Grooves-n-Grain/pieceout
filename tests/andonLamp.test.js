@@ -92,3 +92,27 @@ test('build produces the full parts list with joinery', () => {
     assert.equal(byName['Lid panel'].width, 99.5);
     assert.equal(byName['Base panel'].height, 99.5);
 });
+
+test('validate flags non-positive side panel height without throwing an exception', () => {
+    const bad = { ...params, overallHeight: 40, panelOverlap: 0, panelClearance: 30 };
+    let d;
+    assert.doesNotThrow(() => { d = andonLamp.derive(bad); });
+    assert.ok(d.sidePanelHeight < 0);
+
+    let msgs;
+    assert.doesNotThrow(() => { msgs = andonLamp.validate(bad, d); });
+    assert.ok(msgs.some(m => m.level === 'error' && m.field === 'overallHeight' && /side panel height/i.test(m.message)));
+});
+
+test('panel dowel hole margin against the half-lap uses a wall clearance, not a full diameter', () => {
+    const d = andonLamp.derive(params);
+    // lo = lapLength + dowelHoleDia/2 + MIN_WALL = 25 + 3.1 + 1 = 29.1
+
+    const tooClose = { ...d, panelHoleXs: [29.0] };
+    const msgsTooClose = andonLamp.validate(params, tooClose);
+    assert.ok(msgsTooClose.some(m => m.level === 'error' && m.field === 'panelDowelsPerRail' && /half-laps/i.test(m.message)));
+
+    const clear = { ...d, panelHoleXs: [29.2] };
+    const msgsClear = andonLamp.validate(params, clear);
+    assert.equal(msgsClear.filter(m => m.field === 'panelDowelsPerRail').length, 0);
+});

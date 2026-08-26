@@ -20,6 +20,7 @@ const params = [
     { key: 'railWidth',         label: 'Rail width',           group: 'lamp', default: 25,   min: 5,   step: 0.5, unit: 'mm' },
     { key: 'legSize',           label: 'Leg size (square)',    group: 'lamp', default: 19,   min: 5,   step: 0.5, unit: 'mm' },
     { key: 'panelInset',        label: 'Panel inset',          group: 'lamp', default: 8,    min: 1,   step: 0.5, unit: 'mm' },
+    // Recorded for the cut list and future joint types; v1 geometry does not use it.
     { key: 'panelThickness',    label: 'Panel thickness',      group: 'lamp', default: 3.2,  min: 0.5, step: 0.1, unit: 'mm' },
     { key: 'panelClearance',    label: 'Panel clearance',      group: 'lamp', default: 0.5,  min: 0,   step: 0.1, unit: 'mm' },
     { key: 'panelOverlap',      label: 'Panel overlap into frame', group: 'lamp', default: 6, min: 0, step: 0.5, unit: 'mm' },
@@ -66,6 +67,7 @@ function validate(p, d) {
 
     if (d.legLength <= 0) error('overallHeight', 'Overall height must exceed two stock thicknesses.');
     if (d.sidePanelWidth <= 0) error('panelInset', 'Panel inset leaves no width for the side panel.');
+    if (d.sidePanelHeight <= 0) error('overallHeight', 'Side panel height is zero or negative; increase overall height or panel overlap.');
     if (d.lidSize <= 0) error('railWidth', 'Rail width leaves no opening for the lid.');
     if (d.lapLength * 2 > d.railLength) error('railWidth', 'Half-laps overlap: rail width is more than half the rail length.');
     if (d.lapDepth >= p.stockThickness) error('stockThickness', 'Half-lap depth must be less than the stock thickness.');
@@ -74,8 +76,8 @@ function validate(p, d) {
         error('panelInset', `Panel dowel hole needs ${MIN_WALL} mm of wood on each side; move the inset or widen the rail.`);
     }
     if (d.railLength - 2 * p.legSize <= 0) error('legSize', 'Legs are wider than the rail leaves room for.');
-    const lo = d.lapLength + p.dowelHoleDia;
-    const hi = d.railLength - d.lapLength - p.dowelHoleDia;
+    const lo = d.lapLength + r + MIN_WALL;
+    const hi = d.railLength - d.lapLength - r - MIN_WALL;
     if (d.panelHoleXs.some(x => x < lo || x > hi)) {
         error('panelDowelsPerRail', 'Panel dowel holes land in the half-laps; use fewer dowels or a longer rail.');
     }
