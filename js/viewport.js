@@ -17,16 +17,20 @@ let viewState = {
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let canvasEl = null;
+let initialized = false;
 
 const ZOOM_FACTOR = 1.15;
 const MIN_ZOOM = 0.01;  // Can zoom in to 1% of original
 const MAX_ZOOM = 50;     // Can zoom out to 50x original
 
 /**
- * Initialize viewport controls on the SVG canvas.
+ * Initialize viewport controls on the SVG canvas. Safe to call more than once;
+ * listeners are attached only the first time.
  */
 export function initViewport(canvas) {
     canvasEl = canvas;
+    if (initialized) return;
+    initialized = true;
     const container = canvas.parentElement;
 
     // Mouse wheel zoom

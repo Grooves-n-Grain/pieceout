@@ -15,6 +15,7 @@ import {
 import {
     initViewport, setInitialView, zoomIn, zoomOut, zoomFit,
 } from './viewport.js';
+import { initLayout } from './layout/layoutUI.js';
 
 // --- State ---
 let parsedSVG = null;
@@ -27,6 +28,9 @@ const fileInput = document.getElementById('file-input');
 const canvas = document.getElementById('svg-canvas');
 const viewport = document.getElementById('viewport');
 const layerListEl = document.getElementById('layer-list');
+
+let activeTab = 'preview'; // 'preview' | 'layout'
+const tabButtons = document.querySelectorAll('.tab-btn');
 
 const btnWireframe = document.getElementById('btn-wireframe');
 const btnPreview = document.getElementById('btn-preview');
@@ -52,6 +56,7 @@ fileInput.addEventListener('change', (e) => {
 const container = document.getElementById('viewport-container');
 
 container.addEventListener('dragover', (e) => {
+    if (activeTab === 'layout') return;
     e.preventDefault();
     e.stopPropagation();
     dropZone.classList.add('drag-over');
@@ -61,6 +66,7 @@ container.addEventListener('dragover', (e) => {
 });
 
 container.addEventListener('dragleave', (e) => {
+    if (activeTab === 'layout') return;
     e.preventDefault();
     dropZone.classList.remove('drag-over');
     if (parsedSVG) {
@@ -69,6 +75,7 @@ container.addEventListener('dragleave', (e) => {
 });
 
 container.addEventListener('drop', (e) => {
+    if (activeTab === 'layout') return;
     e.preventDefault();
     e.stopPropagation();
     dropZone.classList.remove('drag-over');
@@ -111,7 +118,6 @@ function loadSVGContent(svgText) {
     updateLayerList();
 
     // Set viewport — pass canvas for accurate content bounds via getBBox()
-    initViewport(canvas);
     const bounds = getSVGBounds(parsedSVG, canvas);
     setInitialView(bounds);
 
@@ -146,6 +152,31 @@ function getBackgroundColor() {
         default: return '#1a1a2e';
     }
 }
+
+// --- Tabs ---
+
+function setTab(tab) {
+    activeTab = tab;
+    document.body.classList.toggle('mode-preview', tab === 'preview');
+    document.body.classList.toggle('mode-layout', tab === 'layout');
+    tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+
+    if (tab === 'preview') {
+        if (parsedSVG) {
+            injectSVG(parsedSVG, canvas);
+            const bounds = getSVGBounds(parsedSVG, canvas);
+            setInitialView(bounds);
+            applyView();
+        } else {
+            canvas.innerHTML = '';
+            dropZone.classList.add('visible');
+        }
+    } else {
+        layout.show();
+    }
+}
+
+tabButtons.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
 
 btnWireframe.addEventListener('click', () => {
     currentView = 'wireframe';
@@ -233,10 +264,12 @@ document.addEventListener('keydown', (e) => {
 
     switch (e.key.toLowerCase()) {
         case 'w':
+            if (activeTab !== 'preview') break;
             currentView = 'wireframe';
             applyView();
             break;
         case 'f':
+            if (activeTab !== 'preview') break;
             currentView = 'preview';
             applyView();
             break;
@@ -252,3 +285,17 @@ document.addEventListener('keydown', (e) => {
             break;
     }
 });
+
+// --- Startup ---
+
+initViewport(canvas);
+
+const layout = initLayout({
+    canvas,
+    onSendToPreview: (svgText) => {
+        loadSVGContent(svgText);
+        setTab('preview');
+    },
+});
+
+setTab('preview');
