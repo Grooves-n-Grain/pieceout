@@ -119,12 +119,18 @@ export function initLayout({ canvas, onSendToPreview }) {
         });
         if (state.sheetIndex >= state.sheets.length) state.sheetIndex = 0;
         sheetSelect.value = String(state.sheetIndex);
+        const count = state.sheets.length;
+        btnExportAll.title = count ? `Download all ${count} sheet${count === 1 ? '' : 's'}` : '';
     }
 
     function showSheet() {
         const sheet = state.sheets[state.sheetIndex];
         const svg = state.svgs[state.sheetIndex];
-        if (!sheet || !svg) return;
+        if (!sheet || !svg) {
+            canvas.innerHTML = '';
+            state.lastShown = null;
+            return;
+        }
         const parsed = parseSVG(svg);
         injectSVG(parsed, canvas);
         showWireframe(canvas, createLayerState(parsed.layers));
@@ -153,15 +159,24 @@ export function initLayout({ canvas, onSendToPreview }) {
                 state.sheets = nest(parts, state.machine);
                 state.svgs = state.sheets.map(sheetToSVG);
             } catch (err) {
-                if (!(err instanceof NestError)) throw err;
-                messages.push({ level: 'error', field: 'sheet', message: err.message });
+                messages.push({
+                    level: 'error',
+                    field: err instanceof NestError ? 'sheet' : 'geometry',
+                    message: err.message,
+                });
                 hasErrors = true;
+                state.sheets = [];
+                state.svgs = [];
             }
         }
 
         if (rebuildForm) renderForm(derived);
         else refreshDerivedValues(derived);
-        const errorFields = renderMessages(messagesEl, messages);
+        const labels = {};
+        for (const def of state.template.params) labels[def.key] = def.label;
+        for (const def of state.template.derivedFields) labels[def.key] = def.label;
+        for (const def of MACHINE_PARAMS) labels[def.key] = def.label;
+        const errorFields = renderMessages(messagesEl, messages, labels);
         markInvalid(formEl, errorFields);
         renderSheetSelect();
         btnExport.disabled = btnExportAll.disabled = btnSend.disabled = hasErrors || !state.sheets.length;
@@ -180,7 +195,9 @@ export function initLayout({ canvas, onSendToPreview }) {
     });
 
     btnExportAll.addEventListener('click', () => {
-        state.sheets.forEach((sheet, i) => downloadText(sheetFileName(state.template.id, sheet), state.svgs[i]));
+        state.sheets.forEach((sheet, i) => {
+            setTimeout(() => downloadText(sheetFileName(state.template.id, sheet), state.svgs[i]), i * 200);
+        });
     });
 
     btnSend.addEventListener('click', () => {

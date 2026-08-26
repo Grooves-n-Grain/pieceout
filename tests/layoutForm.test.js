@@ -61,6 +61,18 @@ test('renderParamInputs builds rows and reports numeric changes', () => {
     assert.ok(input.classList.contains('invalid'));
 });
 
+test('renderParamInputs rejects a value below the schema min', () => {
+    const doc = fakeDocument();
+    const container = doc.createElement('div');
+    const changes = [];
+    renderParamInputs(container, schema, { outerWidth: 150, panelDowelsPerRail: 2 }, (k, v) => changes.push([k, v]));
+    const input = container.querySelector('#param-outerWidth');
+    input.value = '10'; // below min: 20
+    input.dispatch('input');
+    assert.deepEqual(changes, []);
+    assert.ok(input.classList.contains('invalid'));
+});
+
 test('renderDerived disables inputs until overridden', () => {
     const doc = fakeDocument();
     const container = doc.createElement('div');

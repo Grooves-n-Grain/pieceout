@@ -31,8 +31,9 @@ export function renderParamInputs(container, schema, values, onChange) {
         input.value = String(values[def.key]);
         input.addEventListener('input', () => {
             const n = parseNumber(input, def.integer);
-            input.classList.toggle('invalid', n === null);
-            if (n !== null) onChange(def.key, n);
+            const belowMin = n !== null && def.min !== undefined && n < def.min;
+            input.classList.toggle('invalid', n === null || belowMin);
+            if (n !== null && !belowMin) onChange(def.key, n);
         });
         row.appendChild(input);
         row.appendChild(el(doc, 'span', { className: 'unit' }, def.unit || ''));
@@ -48,13 +49,14 @@ export function renderDerived(container, derivedFields, derived, overrides, onCh
         const id = `derived-${def.key}`;
         const overridden = overrides[def.key] !== undefined;
         row.appendChild(el(doc, 'label', { for: id }, def.label));
-        const input = el(doc, 'input', { type: 'number', id, step: 0.1 });
+        const input = el(doc, 'input', { type: 'number', id, step: 0.1, min: 0.1 });
         input.value = String(derived[def.key]);
         input.disabled = !overridden;
         input.addEventListener('input', () => {
             const n = parseNumber(input, false);
-            input.classList.toggle('invalid', n === null);
-            if (n !== null) onChange(def.key, n);
+            const belowMin = n !== null && n < 0.1;
+            input.classList.toggle('invalid', n === null || belowMin);
+            if (n !== null && !belowMin) onChange(def.key, n);
         });
         row.appendChild(input);
         const box = el(doc, 'input', { type: 'checkbox', id: `override-${def.key}`, title: 'Override this value' });
@@ -69,12 +71,13 @@ export function renderDerived(container, derivedFields, derived, overrides, onCh
 }
 
 /** Render messages; returns the Set of field keys that have errors. */
-export function renderMessages(container, messages) {
+export function renderMessages(container, messages, labels = {}) {
     const doc = container.ownerDocument;
     container.innerHTML = '';
     const errorFields = new Set();
     for (const m of messages) {
-        container.appendChild(el(doc, 'div', { className: `msg msg-${m.level}` }, `${m.field}: ${m.message}`));
+        const label = labels[m.field] || m.field;
+        container.appendChild(el(doc, 'div', { className: `msg msg-${m.level}` }, `${label}: ${m.message}`));
         if (m.level === 'error') errorFields.add(m.field);
     }
     return errorFields;
