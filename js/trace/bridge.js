@@ -11,12 +11,14 @@ export function stampDisc(bitmap, cx, cy, radius, out) {
     const r = Math.max(0, radius);
     const R = Math.ceil(r);
     const r2 = r * r;
-    for (let dy = -R; dy <= R; dy++) {
-        for (let dx = -R; dx <= R; dx++) {
+    // Clamp the loop bounds to the bitmap instead of looping the full square and skipping
+    // out-of-bounds cells one at a time - matters when a disc near an edge has a large radius.
+    const dyMin = Math.max(-R, -cy), dyMax = Math.min(R, H - 1 - cy);
+    const dxMin = Math.max(-R, -cx), dxMax = Math.min(R, W - 1 - cx);
+    for (let dy = dyMin; dy <= dyMax; dy++) {
+        for (let dx = dxMin; dx <= dxMax; dx++) {
             if (dx * dx + dy * dy > r2) continue;
-            const x = cx + dx, y = cy + dy;
-            if (x < 0 || y < 0 || x >= W || y >= H) continue;
-            const i = y * W + x;
+            const i = (cy + dy) * W + (cx + dx);
             if (out && data[i] === 0) out.push(i);
             data[i] = 1;
         }

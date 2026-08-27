@@ -39,7 +39,7 @@ function defaults() {
     return Object.fromEntries(ALL_PARAMS.map(p => [p.key, p.default]));
 }
 
-export function initTrace({ canvas, getPanels, onSendToPreview }) {
+export function initTrace({ canvas, getPanels, onSendToPreview, getBackground }) {
     const $ = (id) => document.getElementById(id);
     const imageList = $('group-trace-image').querySelector('.param-list');
     const checkList = $('group-trace-checks').querySelector('.param-list');
@@ -60,7 +60,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     const state = {
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
         base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
-        timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false,
+        timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false, bridgeClampPx: null,
     };
     let timer = null;
 
@@ -94,7 +94,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         } else {
             const parsed = parseSVG(exportSvg(1));
             injectSVG(parsed, canvas);
-            showPreview(canvas, createLayerState(parsed.layers), '#1a1a2e');
+            showPreview(canvas, createLayerState(parsed.layers), getBackground());
             // injectSVG overwrote the viewBox from the SVG's own dimensions; re-apply the
             // current zoom/pan instead of losing it, matching layoutUI.js's showSheet().
             refreshViewBox();
@@ -112,8 +112,15 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         });
         const msgs = [...state.messages, ...state.regenerateMessages];
         if (r && r.islands.length) msgs.push({ level: 'warn', field: 'islands', message: `${r.islands.length} island(s) will fall out unless bridged.` });
+        // Islands are sorted largest first, so islands[0] is the biggest. If it outweighs the
+        // whole body, the threshold or invert setting is almost certainly backwards (black and
+        // white got swapped) rather than there being a genuinely huge island to bridge.
+        if (r && r.islands.length && r.islands[0].area > r.bodyArea) {
+            msgs.push({ level: 'warn', field: 'islands', message: 'The largest island is bigger than the body; check the threshold or invert.' });
+        }
         if (state.panelMissing) msgs.push({ level: 'warn', field: 'panel', message: 'The selected Layout panel no longer exists; using width instead.' });
         if (state.params.bridgeMm < state.params.kerfMm) msgs.push({ level: 'warn', field: 'bridgeMm', message: 'Bridge is narrower than the kerf; it may burn away.' });
+        if (state.bridgeClampPx) msgs.push({ level: 'warn', field: 'bridgeMm', message: `Bridge width clamped to ${state.bridgeClampPx} px for this image.` });
         renderMessages(messagesEl, msgs, { islands: 'Islands', bridgeMm: 'Bridge width', file: 'File', panel: 'Panel', trace: 'Trace' });
         renderStats(statsEl, r ? {
             width: state.edited.width, height: state.edited.height, contours: r.contours.length,
@@ -127,11 +134,23 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     }
 
     function bridgePx() {
-        return Math.max(1, Math.round(state.params.bridgeMm / state.scale));
+        // A bridge wider than the image itself is nonsensical and can make stampDisc do
+        // needless work; cap it to a quarter of the shorter side and tell the user why their
+        // requested width didn't take effect.
+        const cap = Math.max(1, Math.round(Math.min(state.edited.width, state.edited.height) / 4));
+        const px = Math.max(1, Math.round(state.params.bridgeMm / state.scale));
+        if (px > cap) { state.bridgeClampPx = cap; return cap; }
+        state.bridgeClampPx = null;
+        return px;
     }
 
-    function regenerate() {
-        if (!state.imageData) { renderSidebar(); return; }
+    function setBusyButtons(disabled) {
+        for (const btn of [btnBridgeAll, btnUndo, btnVector, btnExport, btnSend, ...islandsEl.querySelectorAll('button')]) {
+            btn.disabled = disabled;
+        }
+    }
+
+    function runPipeline() {
         state.regenerateMessages = [];
         const t0 = performance.now();
         try {
@@ -156,9 +175,22 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
             // Keep whatever state.result/edited already held (from the last successful run)
             // visible rather than clearing them, so a bad parameter doesn't blank the canvas.
             state.regenerateMessages.push({ level: 'error', field: 'trace', message: err.message });
+        } finally {
+            document.body.classList.remove('trace-busy');
+            setBusyButtons(false);
         }
         renderCanvas();
         renderSidebar();
+    }
+
+    function regenerate() {
+        if (!state.imageData) { renderSidebar(); return; }
+        document.body.classList.add('trace-busy');
+        setBusyButtons(true);
+        // The pipeline is synchronous and can block the main thread for a while on a large or
+        // busy image; deferring it one tick lets the wait cursor and disabled buttons actually
+        // paint first, instead of only appearing after the blocking work is already done.
+        setTimeout(runPipeline, 0);
     }
 
     function scheduleRegenerate() {
@@ -172,17 +204,24 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         regenerate();
     }
 
+    function onParamChange(key, value) {
+        state.params[key] = value;
+        // Bridge/delete op seeds are bitmap-pixel coordinates keyed to which side of the
+        // threshold is "black"; flipping invert makes every existing seed meaningless.
+        if (key === 'invert') state.ops = [];
+        scheduleRegenerate();
+    }
+
+    function renderSizeGroup() {
+        renderParamInputs(sizeList, SIZE_PARAMS, state.params, onParamChange);
+        const widthInput = document.getElementById('param-widthMm');
+        if (widthInput) widthInput.disabled = Boolean(state.panelName);
+    }
+
     function renderForm() {
-        const onChange = (key, value) => {
-            state.params[key] = value;
-            // Bridge/delete op seeds are bitmap-pixel coordinates keyed to which side of the
-            // threshold is "black"; flipping invert makes every existing seed meaningless.
-            if (key === 'invert') state.ops = [];
-            scheduleRegenerate();
-        };
-        renderParamInputs(imageList, IMAGE_PARAMS, state.params, onChange);
-        renderParamInputs(checkList, CHECK_PARAMS, state.params, onChange);
-        renderParamInputs(sizeList, SIZE_PARAMS, state.params, onChange);
+        renderParamInputs(imageList, IMAGE_PARAMS, state.params, onParamChange);
+        renderParamInputs(checkList, CHECK_PARAMS, state.params, onParamChange);
+        renderSizeGroup();
     }
 
     function refreshPanelSelect() {
@@ -194,17 +233,26 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
             opt.textContent = `${p.name} (${fmt(p.safeArea.width)} x ${fmt(p.safeArea.height)} mm)`;
             panelSelect.appendChild(opt);
         }
+        let changed = false;
         if (state.panelName && !panels.some(p => p.name === state.panelName)) {
             state.panelName = '';
             state.panelMissing = true;
+            changed = true;
+        } else {
+            // Nothing vanished this time (either no panel was selected, or the selected one
+            // still exists) - the warning from a previous vanish no longer applies.
+            state.panelMissing = false;
         }
         panelSelect.value = state.panelName;
         const widthInput = document.getElementById('param-widthMm');
         if (widthInput) widthInput.disabled = Boolean(state.panelName);
+        return changed;
     }
 
     async function loadFile(file) {
         state.messages = [];
+        state.panelMissing = false;
+        state.bridgeClampPx = null;
         if (!file || !/^image\/(png|jpeg|webp)$/.test(file.type)) {
             state.messages.push({ level: 'error', field: 'file', message: 'Drop a PNG, JPG, or WebP image.' });
             renderSidebar();
@@ -246,8 +294,11 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     panelSelect.addEventListener('change', () => {
         state.panelName = panelSelect.value;
         state.panelMissing = false;
-        const widthInput = document.getElementById('param-widthMm');
-        if (widthInput) widthInput.disabled = Boolean(state.panelName);
+        // No centring in v1 (spec amended by the controller): selecting a panel turns the
+        // outline checkbox off, since the Layout part already supplies its own outline;
+        // selecting None back leaves the checkbox exactly as the user last set it.
+        if (state.panelName) state.params.includeOutline = false;
+        renderSizeGroup();
         regenerate();
     });
     btnBridgeAll.addEventListener('click', () => {
@@ -275,13 +326,16 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
 
     return {
         show() {
-            refreshPanelSelect();
+            const changed = refreshPanelSelect();
             // app.js now owns remembering and restoring each tab's own pan/zoom across a tab
             // switch (see setTab in app.js), so this never calls setInitialView itself - that
             // happens exactly once per image, in loadFile. A panel may have changed its safe
             // area since we were last shown, so only pay for a full regenerate() when a panel
-            // is actually driving the scale; otherwise just repaint what's already computed.
-            if (state.result && state.panelName) regenerate();
+            // is actually driving the scale (state.panelName) or just stopped driving it
+            // (changed, from refreshPanelSelect clearing a vanished panel) - either way the
+            // scale may now be stale and must be recomputed; otherwise just repaint what's
+            // already computed.
+            if (state.result && (state.panelName || changed)) regenerate();
             else if (state.result) { renderCanvas(); renderSidebar(); }
             else canvas.innerHTML = '';
         },

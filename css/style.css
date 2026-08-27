@@ -319,6 +319,10 @@ header h1 {
     background: var(--bg-primary);
 }
 
+body.trace-busy #viewport {
+    cursor: wait;
+}
+
 #viewport.bg-light {
     background: #f0f0f0;
 }
@@ -645,7 +649,7 @@ body.mode-trace #drop-zone {
 
 /* Overlay colours on the shared canvas */
 .trace-island-mark { fill: rgba(233, 69, 96, 0.35); stroke: #e94560; stroke-width: 1; }
-.trace-island-label { fill: #e94560; font-size: 12px; font-family: sans-serif; }
+.trace-island-label { fill: #e94560; font-family: sans-serif; }
 .trace-thin-mark { fill: rgba(245, 166, 35, 0.35); stroke: #f5a623; stroke-width: 1; }
 .trace-bridge { fill: none; stroke: #4ade80; stroke-width: 2; stroke-linecap: round; }
 .trace-contour { fill: none; stroke: #22d3ee; stroke-width: 0.8; }
