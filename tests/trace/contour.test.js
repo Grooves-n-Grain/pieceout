@@ -67,3 +67,44 @@ test('every loop is closed: last point connects back to first by a unit step', (
         }
     }
 });
+
+test('a single-component pinch (bowtie hole) links into one loop, not a figure eight', () => {
+    // Two black pixels touching only at a corner, inside one white sea: the
+    // hole loop must revisit the shared corner (2,2) rather than splitting
+    // into two separate holes or crossing itself.
+    const bm = bitmapFromStrings([
+        '.....',
+        '.#...',
+        '..#..',
+        '.....',
+    ]);
+    const cs = traceContours(bm);
+    assert.equal(cs.length, 1, 'exactly one white component');
+    const [c] = cs;
+    assert.equal(c.holes.length, 1, 'exactly one hole, not two, not a figure eight');
+    const [hole] = c.holes;
+    assert.equal(hole.length, 8, 'unit edges around both pinched black pixels');
+    assert.equal(Math.abs(signedArea(hole)), 2);
+    for (let i = 0; i < hole.length; i++) {
+        const a = hole[i], b = hole[(i + 1) % hole.length];
+        assert.equal(Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]), 1);
+    }
+    const sharedCornerCount = hole.filter(([x, y]) => x === 2 && y === 2).length;
+    assert.equal(sharedCornerCount, 2, 'the shared corner (2,2) is visited twice by the pinch');
+});
+
+test('a single-component pinch on the outer loop is instead two separate components', () => {
+    // Contrast case: the pinch pixels are WHITE (not black), so 4-connectivity
+    // keeps them as two distinct components, each with its own 4-vertex outer
+    // loop, rather than one component with a pinched outer loop.
+    const bm = bitmapFromStrings([
+        '####',
+        '#.##',
+        '##.#',
+        '####',
+    ]);
+    const cs = traceContours(bm);
+    assert.equal(cs.length, 2);
+    assert.deepEqual(cs.map(c => c.outer.length), [4, 4]);
+    assert.deepEqual(cs.map(c => c.holes.length), [0, 0]);
+});

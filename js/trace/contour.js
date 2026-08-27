@@ -80,7 +80,7 @@ export function traceContours(bitmap, whiteAnalysis = labelComponents(bitmap, 0)
     for (let id = 1; id <= count; id++) {
         const contour = { id, area: areas[id], touchesBorder: touchesBorder[id], outer: null, holes: [] };
         for (const loop of linkEdges(edges[id], VW)) {
-            if (loop.length < 4) continue;
+            if (loop.length < 4) throw new Error(`component ${id} produced a degenerate loop of ${loop.length} vertices`);
             if (signedArea(loop) > 0) {
                 if (contour.outer) throw new Error(`component ${id} produced two outer loops`);
                 contour.outer = loop;
