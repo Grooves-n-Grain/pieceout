@@ -175,6 +175,18 @@
                         </ul>
                     </div>
                     <div class="legend-section">
+                        <h4>Trace settings</h4>
+                        <p><strong>Threshold:</strong> the grey level that splits the image into black (material) and white (cut away). Lower it to keep more dark detail, raise it to drop faint greys.</p>
+                        <p><strong>Art is white on black:</strong> tick this when your material is the white part of the image and the black is what gets cut away.</p>
+                        <p><strong>Smoothness:</strong> how much the traced curves are allowed to drift from the pixels. Low keeps every jaggy; high gives smoother, simpler paths.</p>
+                        <p><strong>Min speck size:</strong> black specks and white pinholes smaller than this many pixels are dropped before tracing.</p>
+                        <p><strong>Kerf / bit:</strong> the width your laser or bit removes. Features narrower than this get an orange box because they may burn or break away.</p>
+                        <p><strong>Bridge width:</strong> how wide the tabs that hold an island in place are. A small bridge just needs to hold until the piece is glued, then it snaps off.</p>
+                        <p><strong>Delete islands under:</strong> islands smaller than this area are removed automatically. 0 turns the rule off; kept islands are never removed.</p>
+                        <p><strong>Width:</strong> the real-world width of the finished piece. Height follows the image's proportions. Fit to panel uses a Layout panel's safe area instead.</p>
+                        <p><strong>Include outline:</strong> also cut the outer rectangle of the image. Off when you only want the shapes inside, or when a Layout panel already supplies the outline.</p>
+                    </div>
+                    <div class="legend-section">
                         <h4>Layer keywords (Preview)</h4>
                         <p><strong>CUT:</strong> profile, cut, through, outline, cutout, cut-out, contour, outside, border, perimeter, laser, drill.</p>
                         <p><strong>POCKET:</strong> pocket, engrave, carve, vcarve, v-carve, texture, relief.</p>

@@ -30,8 +30,8 @@ const IMAGE_PARAMS = [
     { key: 'minSpeck', label: 'Min speck size', default: 12, min: 0, max: 200, step: 1, unit: 'px', integer: true },
 ];
 const CHECK_PARAMS = [
-    { key: 'kerfMm', label: 'Kerf / bit', default: 0.3, min: 0, max: 10, step: 0.05, unit: 'mm' },
-    { key: 'bridgeMm', label: 'Bridge width', default: 1.5, min: 0.2, max: 10, step: 0.1, unit: 'mm' },
+    { key: 'kerfMm', label: 'Kerf / bit', default: 0.1, min: 0, max: 10, step: 0.05, unit: 'mm' },
+    { key: 'bridgeMm', label: 'Bridge width', default: 0.8, min: 0.2, max: 10, step: 0.1, unit: 'mm' },
     { key: 'minIslandMm2', label: 'Delete islands under', default: 0, min: 0, max: 10000, step: 0.5, unit: 'mm2' },
 ];
 const SIZE_PARAMS = [
