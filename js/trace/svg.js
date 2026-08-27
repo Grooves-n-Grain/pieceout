@@ -42,7 +42,7 @@ export function tracePipeline(bitmap, { tolerancePx, kerfPx, minSpeckPx }) {
     const shapes = buildShapes(contours, { tolerancePx });
     let bodyArea = 0;
     for (let id = 1; id <= black.count; id++) if (black.body[id]) bodyArea += black.areas[id];
-    return { bitmap: clean, black, islands, thin, contours, shapes, bodyArea };
+    return { bitmap: clean, black, islands, thin, contours, shapes, bodyArea, blackTouchesBorder: black.touchesBorder.some(Boolean) };
 }
 
 function group(name, colour, dashed, elements) {
@@ -50,7 +50,7 @@ function group(name, colour, dashed, elements) {
     return `  <g id="${name}" inkscape:label="${name}" inkscape:groupmode="layer" fill="none" stroke="${colour}" stroke-width="0.3"${dash}>\n${elements.map(e => `    ${e}`).join('\n')}\n  </g>`;
 }
 
-export function shapesToSVG({ shapes, widthPx, heightPx, scale, includeOutline, islands = [], thin = [] }) {
+export function shapesToSVG({ shapes, widthPx, heightPx, scale, includeOutline, islands = [], thin = [], blackTouchesBorder = false }) {
     const W = fmt(widthPx * scale), H = fmt(heightPx * scale);
     const guide = [`<rect x="0" y="0" width="${W}" height="${H}"/>`];
     islands.forEach((island, i) => {
@@ -63,15 +63,22 @@ export function shapesToSVG({ shapes, widthPx, heightPx, scale, includeOutline, 
         guide.push(`<rect x="${fmt(t.bbox.x0 * scale)}" y="${fmt(t.bbox.y0 * scale)}" width="${fmt((t.bbox.x1 - t.bbox.x0 + 1) * scale)}" height="${fmt((t.bbox.y1 - t.bbox.y0 + 1) * scale)}" stroke="${COLORS.THIN}"/>`);
     }
     const cut = [];
-    // A white component that touches the border already has the image rectangle as its own
-    // outer loop, so its path below duplicates the perimeter - only add the separate rect when
-    // no shape supplies it that way. And with the outline off, that same border-touching shape
-    // must be skipped entirely, or panel mode would still cut a full-panel rectangle.
-    if (includeOutline && !shapes.some(s => s.touchesBorder)) cut.push(`<rect x="0" y="0" width="${W}" height="${H}"/>`);
+    // The panel perimeter is its own, independent cut: emit it whenever includeOutline is on,
+    // regardless of what any shape's own loops do.
+    if (includeOutline) cut.push(`<rect x="0" y="0" width="${W}" height="${H}"/>`);
     for (const shape of shapes) {
-        if (!includeOutline && shape.touchesBorder) continue;
-        const d = [pathData(shape.outer, scale), ...shape.holes.map(h => pathData(h, scale))].join(' ');
-        cut.push(`<path fill-rule="evenodd" d="${d}"/>`);
+        // Holes are always real black/white boundaries, so they always get cut. A shape's
+        // outer loop is too, UNLESS it touches the image border with nothing black touching
+        // that border either - then the loop is only tracing the image edge itself (no real
+        // material boundary there), which the perimeter rect above already covers, and cutting
+        // it again would double-cut that edge. When black does touch the border, the outer
+        // loop does carry a real boundary along part of its run, so it's kept (accepting that
+        // the segments it shares with the image edge may then be cut twice - v1 behaviour).
+        const loops = [];
+        if (!shape.touchesBorder || blackTouchesBorder) loops.push(pathData(shape.outer, scale));
+        for (const h of shape.holes) loops.push(pathData(h, scale));
+        if (!loops.length) continue;
+        cut.push(`<path fill-rule="evenodd" d="${loops.join(' ')}"/>`);
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n${group('GUIDE', COLORS.GUIDE, true, guide)}\n${group('CUT', COLORS.CUT, false, cut)}\n</svg>\n`;
 }

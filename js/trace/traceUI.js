@@ -80,6 +80,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         return shapesToSVG({
             shapes: r.shapes, widthPx: state.edited.width, heightPx: state.edited.height, scale,
             includeOutline: state.params.includeOutline, islands: r.islands, thin: r.thin,
+            blackTouchesBorder: r.blackTouchesBorder,
         });
     }
 
@@ -121,7 +122,8 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         if (state.panelMissing) msgs.push({ level: 'warn', field: 'panel', message: 'The selected Layout panel no longer exists; using width instead.' });
         if (state.params.bridgeMm < state.params.kerfMm) msgs.push({ level: 'warn', field: 'bridgeMm', message: 'Bridge is narrower than the kerf; it may burn away.' });
         if (state.bridgeClampPx) msgs.push({ level: 'warn', field: 'bridgeMm', message: `Bridge width clamped to ${state.bridgeClampPx} px for this image.` });
-        renderMessages(messagesEl, msgs, { islands: 'Islands', bridgeMm: 'Bridge width', file: 'File', panel: 'Panel', trace: 'Trace' });
+        if (r && r.blackTouchesBorder) msgs.push({ level: 'warn', field: 'outline', message: 'Black touches the image edge; edge segments may cut twice. Add a white margin for a clean outline.' });
+        renderMessages(messagesEl, msgs, { islands: 'Islands', bridgeMm: 'Bridge width', file: 'File', panel: 'Panel', trace: 'Trace', outline: 'Outline' });
         renderStats(statsEl, r ? {
             width: state.edited.width, height: state.edited.height, contours: r.contours.length,
             segments: r.shapes.reduce((n, s) => n + s.outer.length + s.holes.reduce((m, h) => m + h.length, 0), 0),
