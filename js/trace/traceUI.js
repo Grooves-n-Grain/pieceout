@@ -59,7 +59,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     const state = {
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
         base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
-        timingMs: 0, messages: [],
+        timingMs: 0, messages: [], droppedBridges: 0,
     };
     let timer = null;
 
@@ -108,6 +108,10 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         });
         const msgs = [...state.messages];
         if (r && r.islands.length) msgs.push({ level: 'warn', field: 'islands', message: `${r.islands.length} island(s) will fall out unless bridged.` });
+        if (state.droppedBridges) {
+            const n = state.droppedBridges;
+            msgs.push({ level: 'warn', field: 'islands', message: `${n} island${n === 1 ? '' : 's'} could not be bridged: no path to the body.` });
+        }
         if (state.params.bridgeMm < state.params.kerfMm) msgs.push({ level: 'warn', field: 'bridgeMm', message: 'Bridge is narrower than the kerf; it may burn away.' });
         renderMessages(messagesEl, msgs, { islands: 'Islands', bridgeMm: 'Bridge width', file: 'File', panel: 'Panel' });
         renderStats(statsEl, r ? {
@@ -132,8 +136,11 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         const tolerancePx = 0.5 + 2 * (state.params.smoothness / 100);
         const kerfPx = state.params.kerfMm / state.scale;
         state.base = imageToBitmap(state.imageData, { threshold: state.params.threshold, invert: state.params.invert });
+        const previousBridges = state.ops.filter(o => o.kind === 'bridge').length;
         const replay = applyOps(state.base, state.ops);
         state.ops = replay.ops;
+        const keptBridges = state.ops.filter(o => o.kind === 'bridge').length;
+        state.droppedBridges = Math.max(0, previousBridges - keptBridges);
         state.edited = replay.bitmap;
         state.result = tracePipeline(state.edited, { tolerancePx, kerfPx, minSpeckPx: state.params.minSpeck });
         state.timingMs = performance.now() - t0;

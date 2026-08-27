@@ -38,16 +38,52 @@ test('bridgeIsland connects the island to the body by the shortest gap', () => {
 });
 
 test('bridgeIsland treats other islands as walls and returns null when unreachable', () => {
+    // A border-touching outer frame (definitely the body), a fully closed inner ring
+    // around it with a 1-cell gap (a plain island, not walled off itself), and a dot
+    // sealed inside that ring with no gap at all. The dot can only ever reach the ring
+    // (another island, not the body), never the frame, so bridging it must fail.
     const bm = bitmapFromStrings([
-        '.....',
-        '.###.',
-        '.#.#.',
-        '.###.',
-        '.....',
+        '#########',
+        '#.......#',
+        '#.#####.#',
+        '#.#...#.#',
+        '#.#.#.#.#',
+        '#.#...#.#',
+        '#.#####.#',
+        '#.......#',
+        '#########',
     ]);
     const a = labelComponents(bm, 1);
-    const ring = findIslands(bm, a)[0];
-    assert.equal(bridgeIsland(bm, a, ring.id, 1), null);
+    const islands = findIslands(bm, a);
+    assert.equal(islands.length, 2, 'the ring and the dot are both plain islands (a border-touching frame exists)');
+    const dot = islands.find((i) => i.area === 1);
+    assert.ok(dot);
+    assert.equal(bridgeIsland(bm, a, dot.id, 1), null, "the ring walls the dot off; it can't reach the frame");
+});
+
+test('bridgeIsland reaches a ring that becomes the body via the white-margin fallback', () => {
+    // Same shape as the framed-drawing margin case in components.test.js: nothing here
+    // touches the actual bitmap border, so the ring (the larger of the two black
+    // components) becomes the body, and the dot sealed inside it can now bridge straight
+    // out to its own enclosing wall.
+    const bm = bitmapFromStrings([
+        '.......',
+        '.#####.',
+        '.#...#.',
+        '.#.#.#.',
+        '.#...#.',
+        '.#####.',
+        '.......',
+    ]);
+    const a = labelComponents(bm, 1);
+    const islands = findIslands(bm, a);
+    assert.equal(islands.length, 1, 'the ring is now the body; only the dot remains an island');
+    const dot = islands[0];
+    assert.equal(dot.area, 1);
+    const r = bridgeIsland(bm, a, dot.id, 1);
+    assert.ok(r, 'the ring is body now, so the dot can reach it');
+    const [lx, ly] = r.path[r.path.length - 1];
+    assert.equal(getPixel(bm, lx, ly), 1, 'path ends on a ring pixel');
 });
 
 test('deleteIsland flips the island to white', () => {

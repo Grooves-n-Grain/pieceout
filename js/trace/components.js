@@ -3,6 +3,13 @@
  * island detection. Black (1) uses 8-connectivity so a diagonal touch still
  * holds wood together; white (0) uses 4-connectivity so a diagonal black
  * touch still separates two cuts.
+ *
+ * "Body" (the material that stays attached to the machine bed, as opposed to
+ * an island that falls out) is normally whatever touches the image border.
+ * A drawing scanned with a white margin never touches the border at all, so
+ * for black components (colour 1) only: if nothing touches the border, the
+ * single largest black component is treated as the body instead (the frame
+ * of the drawing), and everything else is still an island.
  */
 
 const N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -54,14 +61,22 @@ export function labelComponents(bitmap, colour) {
         bboxes.push({ x0, y0, x1, y1 });
         seeds.push([start % W, (start - (start % W)) / W]);
     }
-    return { colour, labels, count, areas, touchesBorder, bboxes, seeds };
+
+    const body = touchesBorder.slice();
+    if (colour === 1 && count > 0 && !touchesBorder.some(Boolean)) {
+        let maxId = 1;
+        for (let id = 2; id <= count; id++) if (areas[id] > areas[maxId]) maxId = id;
+        body[maxId] = true;
+    }
+
+    return { colour, labels, count, areas, touchesBorder, body, bboxes, seeds };
 }
 
 export function findIslands(bitmap, analysis = labelComponents(bitmap, 1)) {
     if (analysis.colour !== 1) throw new Error('findIslands needs a black (colour 1) analysis');
     const islands = [];
     for (let id = 1; id <= analysis.count; id++) {
-        if (analysis.touchesBorder[id]) continue;
+        if (analysis.body[id]) continue;
         islands.push({ id, area: analysis.areas[id], bbox: analysis.bboxes[id], seed: analysis.seeds[id] });
     }
     return islands.sort((a, b) => b.area - a.area || a.id - b.id);
