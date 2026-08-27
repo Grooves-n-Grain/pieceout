@@ -6,6 +6,9 @@ import { refreshViewBox } from '../viewport.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 export function bitmapToDataURL(bitmap) {
+    // Material (bitmap value 1) always paints dark and cut (0) always paints light, regardless
+    // of the source image's own colours - the bitmap is already post-invert by the time it gets
+    // here, so this preview stays stable no matter which way "Art is white on black" is set.
     const { width, height, data } = bitmap;
     const c = document.createElement('canvas');
     c.width = width;

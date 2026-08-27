@@ -22,7 +22,7 @@ const DEBOUNCE_MS = 80;
 
 const IMAGE_PARAMS = [
     { key: 'threshold', label: 'Threshold', default: 128, min: 1, max: 254, step: 1, unit: '', integer: true },
-    { key: 'invert', label: 'Invert (white stays)', default: false, type: 'boolean' },
+    { key: 'invert', label: 'Art is white on black', default: false, type: 'boolean' },
     { key: 'smoothness', label: 'Smoothness', default: 40, min: 0, max: 100, step: 5, unit: '%', integer: true },
     { key: 'minSpeck', label: 'Min speck size', default: 12, min: 0, max: 200, step: 1, unit: 'px', integer: true },
 ];
@@ -223,8 +223,13 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     function onParamChange(key, value) {
         state.params[key] = value;
         // Bridge/delete op seeds are bitmap-pixel coordinates keyed to which side of the
-        // threshold is "black"; flipping invert makes every existing seed meaningless.
-        if (key === 'invert') state.ops = [];
+        // threshold is "black"; flipping invert makes every existing seed meaningless. The
+        // island numbering is keyed to seeds too, so restart it or old numbers could resurface
+        // on unrelated islands once the ops that anchored them are gone.
+        if (key === 'invert') {
+            state.ops = [];
+            state.numbering = createNumbering();
+        }
         scheduleRegenerate();
     }
 
