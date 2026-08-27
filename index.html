@@ -13,6 +13,7 @@
             <nav id="tabs">
                 <button id="tab-preview" class="tab-btn active" data-tab="preview">Preview</button>
                 <button id="tab-layout" class="tab-btn" data-tab="layout">Layout</button>
+                <button id="tab-trace" class="tab-btn" data-tab="trace">Trace</button>
             </nav>
             <div id="toolbar">
                 <span class="preview-only toolbar-group">
@@ -36,6 +37,12 @@
                     <button id="btn-export-sheet" class="toolbar-btn" title="Download this sheet as SVG">Export SVG</button>
                     <button id="btn-export-all" class="toolbar-btn" title="Download every sheet">Export all</button>
                     <button id="btn-send-preview" class="toolbar-btn" title="Open this sheet in the Preview tab">Send to Preview</button>
+                    <span class="separator"></span>
+                </span>
+                <span class="trace-only toolbar-group">
+                    <button id="btn-trace-vector" class="toolbar-btn" title="Toggle raster / vector view (V)">Vector</button>
+                    <button id="btn-trace-export" class="toolbar-btn" title="Download the traced SVG">Export SVG</button>
+                    <button id="btn-trace-send" class="toolbar-btn" title="Open the trace in the Preview tab">Send to Preview</button>
                     <span class="separator"></span>
                 </span>
                 <label id="bg-toggle" title="Toggle background">
@@ -94,6 +101,43 @@
                 <div id="layout-footer">
                     <button id="btn-layout-reset" class="small-btn" title="Reset every input to its default">Reset to defaults</button>
                 </div>
+            </aside>
+
+            <aside id="trace-sidebar" class="trace-only">
+                <div id="trace-sidebar-header">
+                    <h2>Trace</h2>
+                    <button id="btn-trace-open" class="small-btn" title="Open a PNG or JPG">Open image</button>
+                    <input type="file" id="trace-file-input" accept="image/png,image/jpeg,image/webp" hidden>
+                </div>
+                <div id="trace-form">
+                    <details id="group-trace-image" open>
+                        <summary>Image</summary>
+                        <div class="param-list"></div>
+                    </details>
+                    <details id="group-trace-checks" open>
+                        <summary>Checks</summary>
+                        <div class="param-list"></div>
+                    </details>
+                    <details id="group-trace-size" open>
+                        <summary>Size</summary>
+                        <div class="param-list"></div>
+                        <div class="param-row">
+                            <label for="trace-panel-select">Fit to panel</label>
+                            <select id="trace-panel-select"><option value="">None</option></select>
+                            <span class="unit"></span>
+                        </div>
+                    </details>
+                    <div id="trace-islands-header">
+                        <h3>Islands: <span id="trace-island-count">0</span></h3>
+                        <div>
+                            <button id="btn-bridge-all" class="small-btn" title="Bridge every island">Bridge all</button>
+                            <button id="btn-trace-undo" class="small-btn" title="Undo the last bridge or delete">Undo</button>
+                        </div>
+                    </div>
+                    <div id="trace-islands"></div>
+                    <div id="trace-messages"></div>
+                </div>
+                <div id="trace-stats"></div>
             </aside>
 
             <div id="viewport-container">
