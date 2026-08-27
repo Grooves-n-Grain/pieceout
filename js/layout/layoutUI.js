@@ -153,6 +153,7 @@ export function initLayout({ canvas, onSendToPreview }) {
             ...validateMachine(state.machine),
         ];
         let hasErrors = messages.some(m => m.level === 'error');
+        if (hasErrors) state.parts = [];
 
         if (!hasErrors) {
             try {
