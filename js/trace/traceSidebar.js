@@ -1,6 +1,11 @@
 // js/trace/traceSidebar.js
 /** Island list and stats rendering for the Trace sidebar. Pure DOM building, no state. */
 
+// Shared with islandPopover.js so both places format an island's area the same way.
+export function formatMm2(mm2) {
+    return mm2 < 10 ? mm2.toFixed(1) : Math.round(mm2);
+}
+
 export function renderIslandList(container, countEl, islands, scaleMmPerPx, { selected, onSelect, onBridge, onDelete, onKeep }) {
     container.innerHTML = '';
     countEl.textContent = String(islands.length);
@@ -14,12 +19,15 @@ export function renderIslandList(container, countEl, islands, scaleMmPerPx, { se
     islands.forEach((island) => {
         const row = document.createElement('div');
         row.className = 'island-row' + (island.number === selected ? ' selected' : '') + (island.kept ? ' kept' : '');
+        // traceUI re-resolves this row by number to (re)position an open popover after a
+        // re-render, since the DOM node it last saw is gone as soon as this list rebuilds.
+        row.dataset.islandNumber = String(island.number);
         const mm2 = island.area * scaleMmPerPx * scaleMmPerPx;
         const keepLabel = island.kept ? 'Unkeep' : 'Keep';
         const keepTitle = island.kept ? 'Stop keeping this island' : 'Keep this island as a separate piece';
         row.innerHTML = `
             <span class="island-index">${island.number}</span>
-            <span class="island-area">${mm2 < 10 ? mm2.toFixed(1) : Math.round(mm2)} mm2</span>
+            <span class="island-area">${formatMm2(mm2)} mm2</span>
             <button class="small-btn" data-action="bridge" title="Bridge to the body">Bridge</button>
             <button class="small-btn" data-action="delete" title="Remove this island">Delete</button>
             <button class="small-btn" data-action="keep" title="${keepTitle}">${keepLabel}</button>

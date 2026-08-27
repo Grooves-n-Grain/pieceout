@@ -4,10 +4,7 @@
  * small box anchored next to whatever was clicked. Pure DOM building, same style as
  * traceSidebar.js; no state lives here beyond what's already in the DOM it builds.
  */
-
-function fmtMm2(mm2) {
-    return mm2 < 10 ? mm2.toFixed(1) : Math.round(mm2);
-}
+import { formatMm2 } from './traceSidebar.js';
 
 function button(doc, text, title, onClick) {
     const btn = doc.createElement('button');
@@ -25,7 +22,7 @@ export function renderIslandPopover(el, island, { bridgeMm, kept, onBridge, onPl
 
     const header = doc.createElement('div');
     header.className = 'popover-header';
-    header.textContent = `Island ${island.number} (${fmtMm2(island.mm2)} mm2)`;
+    header.textContent = `Island ${island.number} (${formatMm2(island.mm2)} mm2)`;
     el.appendChild(header);
 
     const row = doc.createElement('div');
@@ -49,7 +46,7 @@ export function renderIslandPopover(el, island, { bridgeMm, kept, onBridge, onPl
     // keydown from INPUT elements), so this is the only way to close the popover with the
     // keyboard while the width field has focus.
     input.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+        if (e.key === 'Escape') onClose();
     });
 
     function currentWidthMm() {

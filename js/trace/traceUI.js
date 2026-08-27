@@ -65,6 +65,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     const bridgeHintEl = $('trace-bridge-hint');
     const popoverEl = $('trace-island-popover');
     const viewportContainerEl = $('viewport-container');
+    const traceFormEl = $('trace-form');
     const DEFAULT_HINT = bridgeHintEl.textContent;
 
     const state = {
@@ -114,16 +115,23 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         btnVector.textContent = state.view === 'raster' ? 'Vector' : 'Raster';
     }
 
-    // anchorEl is the DOM element the popover should be anchored next to (a sidebar row or the
-    // canvas mark that was clicked); omitted when the selection changes for some other reason,
+    // anchorKind is 'row' or 'mark' - which kind of element the popover should anchor next to
+    // (a sidebar row or the canvas mark that was clicked). It's a descriptor, not the DOM node
+    // itself: the node gets re-resolved by number every time the popover is (re)positioned,
+    // since renderCanvas()/renderSidebar() above just tore down and rebuilt the DOM a moved-to
+    // node would have pointed into. Omitted when the selection changes for some other reason,
     // in which case any open popover no longer applies to anything and is closed.
-    function selectIsland(number, anchorEl) {
+    function selectIsland(number, anchorKind) {
+        // Selecting a different island while "place bridge" targets one makes that mode
+        // ambiguous (place it for the old island, or the one just clicked?) - cancel it rather
+        // than guess, same as Escape would.
+        if (state.placing && state.placing.number !== number) state.placing = null;
         state.selectedIsland = number;
         renderCanvas();
         renderSidebar();
-        if (!anchorEl) { closePopover(); return; }
+        if (!anchorKind) { closePopover(); return; }
         const island = state.result && state.result.islands.find((i) => i.number === number);
-        if (island) openPopover(island, anchorEl);
+        if (island) openPopover(island, anchorKind);
     }
 
     function renderHint() {
@@ -136,7 +144,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         const r = state.result;
         renderIslandList(islandsEl, islandCountEl, r ? r.islands : [], state.scale, {
             selected: state.selectedIsland,
-            onSelect: (island, row) => selectIsland(island.number, row),
+            // traceSidebar still hands back the row element (useful to other callers), but the
+            // popover only needs to know it came from a sidebar row - see selectIsland.
+            onSelect: (island) => selectIsland(island.number, 'row'),
             onBridge: (island) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() }),
             onDelete: (island) => pushOp({ kind: 'delete', seed: island.seed }),
             onKeep: (island) => toggleKeep(island),
@@ -195,39 +205,68 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         syncPopover();
     }
 
-    // bridgePxFor generalises the old fixed-width bridgePx() to any mm value, so the popover's
-    // own width field can differ from the global Bridge width setting. Both share the same cap:
-    // a bridge wider than the image itself is nonsensical and can make stampDisc do needless
-    // work, so it's clamped to a quarter of the shorter side and the user is told why their
-    // requested width didn't take effect.
-    function bridgePxFor(mm) {
+    // Pure: works out the clamped bridge width in px for any mm value without touching state, so
+    // a one-off per-island width (popover Bridge/Place bridge) can't clobber the persistent
+    // "Bridge width clamped" warning that tracks the global Bridge width setting. A bridge wider
+    // than the image itself is nonsensical and can make stampDisc do needless work, so it's
+    // clamped to a quarter of the shorter side.
+    function clampBridgePx(mm) {
         const cap = Math.max(1, Math.round(Math.min(state.edited.width, state.edited.height) / 4));
         const px = Math.max(1, Math.round(mm / state.scale));
-        if (px > cap) { state.bridgeClampPx = cap; return cap; }
-        state.bridgeClampPx = null;
-        return px;
+        return px > cap ? { px: cap, clamped: true } : { px, clamped: false };
     }
 
+    // The only caller that persists a clamp into state: the global Bridge width setting gets an
+    // ongoing "clamped to N px" message (see renderSidebar) for as long as it stays too wide,
+    // recomputed on every pipeline run since the cap depends on image size and scale.
     function bridgePx() {
-        return bridgePxFor(state.params.bridgeMm);
+        const { px, clamped } = clampBridgePx(state.params.bridgeMm);
+        state.bridgeClampPx = clamped ? px : null;
+        return px;
     }
 
     // --- Island popover: bridge/place/delete/keep for whichever island was last selected ---
 
+    // Re-resolves the popover's anchor element by island number on every reposition, rather than
+    // holding a DOM reference: renderCanvas()/renderSidebar() rebuild their containers from
+    // scratch on every render (innerHTML = ''), which would otherwise detach the node the
+    // popover was anchored to and leave it permanently mispositioned. Falls back to the other
+    // kind of anchor if the one the popover was opened with no longer exists (e.g. a 'mark'
+    // anchor after switching to vector view, where the raster overlay isn't in the DOM).
+    function resolvePopoverAnchor() {
+        if (!state.popover) return null;
+        const n = state.popover.number;
+        const byRow = () => islandsEl.querySelector(`.island-row[data-island-number="${n}"]`);
+        const byMark = () => canvas.querySelector(`rect[data-island-number="${n}"]`);
+        const primary = state.popover.anchor === 'row' ? byRow() : byMark();
+        if (primary) return primary;
+        return state.popover.anchor === 'row' ? byMark() : byRow();
+    }
+
     function positionPopoverNow() {
         if (!state.popover) return;
-        const anchorRect = state.popover.anchorEl.getBoundingClientRect();
+        const anchorEl = resolvePopoverAnchor();
+        if (!anchorEl) { closePopover(); return; }
+        const anchorRect = anchorEl.getBoundingClientRect();
         const viewportRect = viewportContainerEl.getBoundingClientRect();
         positionPopover(popoverEl, anchorRect, viewportRect);
     }
 
     function renderPopoverContents(island) {
         const mm2 = island.area * state.scale * state.scale;
+        // A per-island width that gets clamped is a one-off event worth a one-shot warning, not
+        // the persistent "Bridge width clamped" message bridgePx() maintains for the global
+        // Bridge width setting - clampBridgePx never writes to state, so it can't clobber that.
+        const warnIfClamped = (widthMm) => {
+            const { px, clamped } = clampBridgePx(widthMm);
+            if (clamped) pushClickWarning(`Bridge width clamped to ${px} px for this image.`);
+            return px;
+        };
         renderIslandPopover(popoverEl, { ...island, mm2 }, {
             bridgeMm: state.params.bridgeMm,
             kept: Boolean(island.kept),
-            onBridge: (widthMm) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePxFor(widthMm) }),
-            onPlace: (widthMm) => startPlacing(island, widthMm),
+            onBridge: (widthMm) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: warnIfClamped(widthMm) }),
+            onPlace: (widthMm) => startPlacing(island, warnIfClamped(widthMm)),
             onDelete: () => pushOp({ kind: 'delete', seed: island.seed }),
             onKeep: () => toggleKeep(island),
             onClose: () => closePopover(),
@@ -245,8 +284,8 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         positionPopoverNow();
     }
 
-    function openPopover(island, anchorEl) {
-        state.popover = { number: island.number, anchorEl };
+    function openPopover(island, anchorKind) {
+        state.popover = { number: island.number, anchor: anchorKind };
         popoverEl.hidden = false;
         syncPopover();
     }
@@ -258,8 +297,8 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         popoverEl.innerHTML = '';
     }
 
-    function startPlacing(island, widthMm) {
-        state.placing = { number: island.number, widthPx: bridgePxFor(widthMm) };
+    function startPlacing(island, widthPx) {
+        state.placing = { number: island.number, widthPx };
         closePopover();
         renderSidebar();
     }
@@ -449,7 +488,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             return;
         }
         const hit = e.target.closest && e.target.closest('[data-island-number]');
-        if (hit) selectIsland(Number(hit.dataset.islandNumber), hit);
+        if (hit) selectIsland(Number(hit.dataset.islandNumber), 'mark');
     });
 
     // Closes the popover on a click anywhere else - a mousedown listener rather than 'click' so
@@ -464,6 +503,13 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     // that rect without going through regenerate(), so it needs its own close here.
     canvas.parentElement.addEventListener('wheel', () => {
         if (document.body.classList.contains('mode-trace')) closePopover();
+    });
+
+    // A row-anchored popover's anchor moves when the sidebar scrolls, same problem as the wheel
+    // case above but reposition rather than close - scrolling the list to see other islands
+    // shouldn't dismiss the one popover already open.
+    traceFormEl.addEventListener('scroll', () => {
+        if (state.popover) positionPopoverNow();
     });
 
     function onParamChange(key, value) {
