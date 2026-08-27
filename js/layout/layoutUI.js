@@ -5,6 +5,7 @@
  * through the existing renderer.
  */
 import { andonLamp } from './templates/andonLamp.js';
+import { Material } from './parts.js';
 import { MACHINE_PARAMS, defaultMachine, validateMachine } from './machine.js';
 import { nest, NestError } from './nest.js';
 import { sheetToSVG, sheetFileName } from './svgWriter.js';
@@ -231,7 +232,7 @@ export function initLayout({ canvas, onSendToPreview }) {
         },
         getPanels() {
             return state.parts
-                .filter(p => p.material === 'basswood')
+                .filter(p => p.material === Material.BASSWOOD)
                 .map(p => {
                     const guide = p.features.find(f => f.layer === 'GUIDE' && f.shape.kind === 'rect');
                     const safeArea = guide

@@ -30,7 +30,7 @@ const canvas = document.getElementById('svg-canvas');
 const viewport = document.getElementById('viewport');
 const layerListEl = document.getElementById('layer-list');
 
-let activeTab = 'preview'; // 'preview' | 'layout'
+let activeTab = 'preview'; // 'preview' | 'layout' | 'trace'
 const tabViews = {}; // per-tab saved pan/zoom, keyed by tab name
 const tabButtons = document.querySelectorAll('.tab-btn');
 
@@ -318,23 +318,23 @@ document.addEventListener('keydown', (e) => {
 
 initViewport(canvas);
 
+// Switch tabs first: loadSVGContent mutates the shared viewport, and it must do so while
+// Preview is already the active tab (see the comment on loadSVGContent).
+function sendToPreview(svgText) {
+    setTab('preview');
+    loadSVGContent(svgText);
+}
+
 const layout = initLayout({
     canvas,
-    onSendToPreview: (svgText) => {
-        // Switch tabs first: loadSVGContent mutates the shared viewport, and it must do so
-        // while Preview is already the active tab (see the comment on loadSVGContent).
-        setTab('preview');
-        loadSVGContent(svgText);
-    },
+    onSendToPreview: sendToPreview,
 });
 
 const trace = initTrace({
     canvas,
     getPanels: () => layout.getPanels(),
-    onSendToPreview: (svgText) => {
-        setTab('preview');
-        loadSVGContent(svgText);
-    },
+    onSendToPreview: sendToPreview,
+    getBackground: getBackgroundColor,
 });
 
 setTab('preview');

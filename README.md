@@ -72,7 +72,7 @@ Mouse wheel zooms; click-drag pans; pinch + one-finger pan work on touch devices
 
 ## How it works
 
-Six vanilla JS modules, loaded directly as ES6 modules from `index.html`:
+Seven vanilla JS modules, loaded directly as ES6 modules from `index.html`:
 
 - **[`js/svgParser.js`](js/svgParser.js)** — DOMParser-based SVG parsing. Extracts layers from `<g>` elements via `inkscape:label` or `id`. Collects all shape primitives (path / polygon / rect / circle / ellipse / line) per layer.
 - **[`js/layerTagger.js`](js/layerTagger.js)** — keyword-based auto-classification with localStorage-persisted overrides.
