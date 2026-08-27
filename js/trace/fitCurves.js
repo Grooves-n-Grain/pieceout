@@ -65,13 +65,16 @@ function generateBezier(d, first, last, u, tHat1, tHat2) {
     const detC0C1 = C[0][0] * C[1][1] - C[1][0] * C[0][1];
     const detC0X = C[0][0] * X[1] - C[1][0] * X[0];
     const detXC1 = X[0] * C[1][1] - X[1] * C[0][1];
-    let alphaL = detC0C1 === 0 ? 0 : detXC1 / detC0C1;
-    let alphaR = detC0C1 === 0 ? 0 : detC0X / detC0C1;
+    const singular = Math.abs(detC0C1) < 1e-12;
+    let alphaL = singular ? 0 : detXC1 / detC0C1;
+    let alphaR = singular ? 0 : detC0X / detC0C1;
     const segLength = Math.sqrt(dist2(d[last], d[first]));
     const epsilon = 1e-6 * segLength;
     if (alphaL < epsilon || alphaR < epsilon) {
         alphaL = alphaR = segLength / 3;
     }
+    alphaL = Math.min(alphaL, segLength);
+    alphaR = Math.min(alphaR, segLength);
     return [d[first], add(d[first], scale(tHat1, alphaL)), add(d[last], scale(tHat2, alphaR)), d[last]];
 }
 
@@ -94,7 +97,8 @@ function newtonRaphson(bez, p, u) {
     const numerator = dot(diff, q1);
     const denominator = dot(q1, q1) + dot(diff, q2);
     if (denominator === 0) return u;
-    return u - numerator / denominator;
+    const result = u - numerator / denominator;
+    return Math.max(0, Math.min(1, result));
 }
 
 function reparameterize(d, first, last, u, bez) {
@@ -130,12 +134,30 @@ function fitChain(pts, error2, tHat1, tHat2, out) {
 }
 
 function interiorAngleDeg(prev, p, next) {
-    const a = normalize(sub(prev, p)), b = normalize(sub(next, p));
+    const e1 = sub(prev, p), e2 = sub(next, p);
+    if (len(e1) === 0 || len(e2) === 0) return 180;
+    const a = normalize(e1), b = normalize(e2);
     const c = Math.max(-1, Math.min(1, dot(a, b)));
     return Math.acos(c) * 180 / Math.PI;
 }
 
+/** Drop consecutive duplicate vertices (including the closing wrap from last to first). */
+function dedupeClosed(points) {
+    const out = [];
+    for (const p of points) {
+        const last = out[out.length - 1];
+        if (!last || last[0] !== p[0] || last[1] !== p[1]) out.push(p);
+    }
+    while (out.length > 1) {
+        const first = out[0], last = out[out.length - 1];
+        if (first[0] === last[0] && first[1] === last[1]) out.pop();
+        else break;
+    }
+    return out;
+}
+
 export function fitBeziers(points, errorPx, cornerAngleDeg = 100) {
+    points = dedupeClosed(points);
     const n = points.length;
     if (n < 3) throw new Error('fitBeziers needs a closed polygon with at least 3 points');
     const error2 = errorPx * errorPx;
@@ -150,6 +172,16 @@ export function fitBeziers(points, errorPx, cornerAngleDeg = 100) {
         fitChain(chain, error2, tHat1, scale(tHat1, -1), out);
         return out;
     }
+    if (corners.length === 1) {
+        const s = corners[0];
+        const chain = [];
+        for (let i = 0; i < n; i++) chain.push(points[(s + i) % n]);
+        chain.push(points[s]);
+        const tHat1 = normalize(sub(points[(s + 1) % n], points[s]));
+        const tHat2 = normalize(sub(points[(s + n - 1) % n], points[s]));
+        fitChain(chain, error2, tHat1, tHat2, out);
+        return out;
+    }
     for (let k = 0; k < corners.length; k++) {
         const s = corners[k], e = corners[(k + 1) % corners.length];
         const chain = [];
@@ -157,7 +189,6 @@ export function fitBeziers(points, errorPx, cornerAngleDeg = 100) {
             chain.push(points[i]);
             if (i === e) break;
         }
-        if (chain.length === 1) continue;
         const tHat1 = normalize(sub(chain[1], chain[0]));
         const tHat2 = normalize(sub(chain[chain.length - 2], chain[chain.length - 1]));
         fitChain(chain, error2, tHat1, tHat2, out);

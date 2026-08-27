@@ -41,5 +41,17 @@ export function simplifyPolygon(points, tolerancePx) {
     const a = rdpOpen(points.slice(0, far + 1), tolerancePx);
     const b = rdpOpen(points.slice(far).concat([points[0]]), tolerancePx);
     const out = a.concat(b.slice(1, -1));
-    return out.length >= 3 ? out : [points[0], points[far], points[Math.floor(far / 2)]];
+    if (out.length >= 3) return out;
+    let thirdIdx = -1, thirdDist = 0;
+    for (let i = 0; i < points.length; i++) {
+        if (i === 0 || i === far) continue;
+        const d = perpDistance(points[i], points[0], points[far]);
+        if (d > thirdDist) { thirdDist = d; thirdIdx = i; }
+    }
+    if (thirdIdx >= 0) return [points[0], points[far], points[thirdIdx]];
+    const fallbackIdx = Math.max(1, far - 1) === far ? 0 : far - 1;
+    const candidate = points[fallbackIdx];
+    const distinctFromFirst = candidate[0] !== points[0][0] || candidate[1] !== points[0][1];
+    const distinctFromFar = candidate[0] !== points[far][0] || candidate[1] !== points[far][1];
+    return distinctFromFirst && distinctFromFar ? [points[0], points[far], candidate] : points.slice();
 }

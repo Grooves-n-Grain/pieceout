@@ -69,3 +69,71 @@ test('bezierPoint evaluates end points and midpoint', () => {
     assert.deepEqual(bezierPoint(seg, 1), [10, 0]);
     assert.deepEqual(bezierPoint(seg, 0.5), [5, 7.5]);
 });
+
+// Tangent lines from an external apex to a circle, joined by the major arc:
+// the classic teardrop / ice-cream-cone shape. Tangency makes the arc-line
+// junctions smooth (interior angle near 180deg); only the apex is sharp.
+function teardrop(n, r, cx, cy, apexDist) {
+    const apex = [cx + apexDist, cy];
+    const alpha = Math.acos(r / apexDist);
+    const t1Angle = alpha;
+    const t2Angle = Math.PI * 2 - alpha;
+    const pts = [apex];
+    for (let i = 0; i < n; i++) {
+        const a = t1Angle + (i / (n - 1)) * (t2Angle - t1Angle);
+        pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return pts;
+}
+
+test('fitBeziers handles a single-corner contour (teardrop) without vanishing', () => {
+    // 60 points: 1 apex (sharp corner) + 59 arc points (smooth), so exactly
+    // one vertex has an interior angle below the 100deg default threshold.
+    const pts = teardrop(59, 50, 100, 100, 150);
+    const segs = fitBeziers(pts, 0.5);
+    assert.ok(segs.length > 0, 'single-corner contour must not fit to an empty segment list');
+    for (const p of pts) assert.ok(minDistanceToSegments(p, segs) <= 0.6, 'point within tolerance');
+    for (let i = 0; i < segs.length; i++) {
+        const next = segs[(i + 1) % segs.length];
+        assert.deepEqual(segs[i][3], next[0], 'segments chain and close');
+    }
+});
+
+test('fitBeziers ignores a duplicate consecutive vertex', () => {
+    const pts = circle(64, 50);
+    const withDup = [...pts.slice(0, 10), pts[9], ...pts.slice(10)];
+    const segs = fitBeziers(pts, 0.5);
+    const segsWithDup = fitBeziers(withDup, 0.5);
+    assert.equal(segsWithDup.length, segs.length, 'duplicate vertex must not force a spurious corner');
+});
+
+function roundedSquare(side, r, arcN) {
+    const cx = side - r, cy = side - r;
+    const arc = Array.from({ length: arcN }, (_, i) => {
+        const t = (i / (arcN - 1)) * (Math.PI / 2);
+        return [cx + r * Math.cos(t), cy + r * Math.sin(t)];
+    });
+    return [[0, 0], [side, 0], ...arc, [0, side]];
+}
+
+test('fitBeziers fits a square with one rounded corner (3 sharp corners + a 10-point arc)', () => {
+    const pts = roundedSquare(40, 15, 10);
+    const segs = fitBeziers(pts, 0.5);
+    assert.ok(segs.length >= 4, `got ${segs.length} segments`);
+    for (const p of pts) assert.ok(minDistanceToSegments(p, segs) <= 0.6, 'point within tolerance');
+    for (let i = 0; i < segs.length; i++) {
+        const next = segs[(i + 1) % segs.length];
+        assert.deepEqual(segs[i][3], next[0], 'segments chain and close');
+    }
+});
+
+test('simplifyPolygon on 4 collinear points returns 3 distinct points or the original', () => {
+    const out = simplifyPolygon([[0, 0], [1, 0], [2, 0], [3, 0]], 0.5);
+    if (out.length === 3) {
+        const key = (p) => `${p[0]},${p[1]}`;
+        const keys = out.map(key);
+        assert.equal(new Set(keys).size, 3, 'the 3 fallback points must be distinct');
+    } else {
+        assert.deepEqual(out, [[0, 0], [1, 0], [2, 0], [3, 0]], 'otherwise falls back to the original points');
+    }
+});
