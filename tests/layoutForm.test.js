@@ -73,6 +73,20 @@ test('renderParamInputs rejects a value below the schema min', () => {
     assert.ok(input.classList.contains('invalid'));
 });
 
+test('renderParamInputs rejects a value above the schema max', () => {
+    const doc = fakeDocument();
+    const container = doc.createElement('div');
+    const changes = [];
+    const maxSchema = [{ key: 'threshold', label: 'Threshold', min: 1, max: 254, step: 1, integer: true }];
+    renderParamInputs(container, maxSchema, { threshold: 128 }, (k, v) => changes.push([k, v]));
+    const input = container.querySelector('#param-threshold');
+    assert.equal(input.getAttribute('max'), '254');
+    input.value = '300'; // above max: 254
+    input.dispatch('input');
+    assert.deepEqual(changes, []);
+    assert.ok(input.classList.contains('invalid'));
+});
+
 test('renderDerived disables inputs until overridden', () => {
     const doc = fakeDocument();
     const container = doc.createElement('div');

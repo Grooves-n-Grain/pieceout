@@ -94,6 +94,27 @@ test('a framed drawing with a wide white margin: the frame is the body, everythi
     assert.deepEqual(islands[0].seed, [4, 4]);
 });
 
+test('findIslands sorts islands largest first when a border-touching frame is present', () => {
+    // A real border-touching frame (so the white-margin fallback never engages) with a 2x2
+    // blob and a single dot floating free inside it, at different distances from nothing in
+    // particular - just two plain islands of different sizes to check the sort order.
+    const bm = bitmapFromStrings([
+        '#########',
+        '#.......#',
+        '#.##....#',
+        '#.##....#',
+        '#.......#',
+        '#.....#.#',
+        '#.......#',
+        '#.......#',
+        '#########',
+    ]);
+    const islands = findIslands(bm);
+    assert.equal(islands.length, 2);
+    assert.equal(islands[0].area, 4, 'the 2x2 blob is listed first');
+    assert.equal(islands[1].area, 1, 'the single dot is listed second');
+});
+
 test('body for a white (colour 0) analysis is just a copy of touchesBorder', () => {
     const a = labelComponents(ring, 0);
     assert.deepEqual(a.body, a.touchesBorder);

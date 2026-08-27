@@ -105,6 +105,7 @@ test('applyOps replays bridges and deletes, dropping ops whose island is gone', 
     assert.equal(r.ops.length, 1);
     assert.equal(r.ops[0].kind, 'bridge');
     assert.equal(r.ops[0].path.length, 3);
+    assert.deepEqual(r.dropped.map((d) => d.reason), ['merged', 'gone'], 'the second delete targets the now-bridged island; the third targets nothing');
     assert.equal(findIslands(r.bitmap).length, 0);
 });
 
@@ -140,6 +141,7 @@ test('applyOps drops a delete whose island was already bridged into the body', (
     const r = applyOps(bm, ops);
     assert.equal(r.ops.length, 1);
     assert.equal(r.ops[0].kind, 'bridge');
+    assert.deepEqual(r.dropped.map((d) => d.reason), ['merged']);
     assert.equal(findIslands(r.bitmap).length, 0);
 });
 
@@ -152,7 +154,28 @@ test('applyOps drops a bridge whose island was already deleted', () => {
     const r = applyOps(bm, ops);
     assert.equal(r.ops.length, 1);
     assert.equal(r.ops[0].kind, 'delete');
+    assert.deepEqual(r.dropped.map((d) => d.reason), ['gone']);
     assert.equal(findIslands(r.bitmap).length, 0);
+});
+
+test('applyOps reports an unreachable bridge with reason "unreachable", not silently', () => {
+    // Same walled shape as the bridgeIsland test above: a border-touching outer frame, a
+    // sealed inner ring (a real island, not the body), and a dot fully walled inside it.
+    const bm = bitmapFromStrings([
+        '#########',
+        '#.......#',
+        '#.#####.#',
+        '#.#...#.#',
+        '#.#.#.#.#',
+        '#.#...#.#',
+        '#.#####.#',
+        '#.......#',
+        '#########',
+    ]);
+    const dot = findIslands(bm).find((i) => i.area === 1);
+    const r = applyOps(bm, [{ kind: 'bridge', seed: dot.seed, widthPx: 1 }]);
+    assert.equal(r.ops.length, 0);
+    assert.deepEqual(r.dropped.map((d) => d.reason), ['unreachable']);
 });
 
 test('applyOps stays fast when bridging many islands on a large bitmap', () => {
@@ -218,6 +241,7 @@ test('applyOps drops a delete for an island a bridge fused into the body diagona
     const r = applyOps(bm, ops);
     assert.equal(r.ops.length, 1, 'the delete on C is dropped');
     assert.equal(r.ops[0].kind, 'bridge');
+    assert.deepEqual(r.dropped.map((d) => d.reason), ['merged']);
     assert.equal(getPixel(r.bitmap, 3, 4), 1, "C's pixels are still black");
     assert.equal(findIslands(r.bitmap).length, 0);
 });

@@ -101,6 +101,7 @@ function mergeDiagonalNeighbours(bitmap, analysis, stamped) {
 export function applyOps(bitmap, ops) {
     let current = bitmap;
     const kept = [];
+    const dropped = [];
     // Label once, then patch the analysis incrementally as ops are applied instead of
     // relabelling the whole bitmap per op (that was O(ops * pixels), dominant cost on a
     // large image with many ops). A delete leaves its island's old labels stale rather than
@@ -117,13 +118,18 @@ export function applyOps(bitmap, ops) {
         const inBounds = x >= 0 && y >= 0 && x < current.width && y < current.height;
         const idx = inBounds ? y * current.width + x : -1;
         const id = inBounds ? a.labels[idx] : 0;
-        if (!id || a.body[id] || current.data[idx] !== 1) continue;
+        // 'gone': the seed pixel isn't black any more (never was, or a prior op deleted its
+        // island out from under it). 'merged': the seed's island is already the body (either
+        // it always was, or an earlier op in this batch bridged or diagonally fused it in) -
+        // applying this op again would be a no-op, not a failure.
+        if (!id || current.data[idx] !== 1) { dropped.push({ op, reason: 'gone' }); continue; }
+        if (a.body[id]) { dropped.push({ op, reason: 'merged' }); continue; }
         if (op.kind === 'delete') {
             current = deleteIsland(current, a, id);
             kept.push({ kind: 'delete', seed: op.seed });
         } else if (op.kind === 'bridge') {
             const r = bridgeIsland(current, a, id, op.widthPx);
-            if (!r) continue;
+            if (!r) { dropped.push({ op, reason: 'unreachable' }); continue; }
             current = r.bitmap;
             // The island is now part of the body: its bridge pixels join its label, and the
             // label is marked body so later ops can path into it or target it.
@@ -135,5 +141,5 @@ export function applyOps(bitmap, ops) {
             throw new Error(`unknown op kind ${op.kind}`);
         }
     }
-    return { bitmap: current, ops: kept };
+    return { bitmap: current, ops: kept, dropped };
 }

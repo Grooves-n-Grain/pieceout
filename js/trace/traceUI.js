@@ -13,7 +13,8 @@ import { downloadText } from '../layout/download.js';
 import { parseSVG } from '../svgParser.js';
 import { injectSVG, showPreview } from '../renderer.js';
 import { createLayerState } from '../layerTagger.js';
-import { setInitialView } from '../viewport.js';
+import { setInitialView, refreshViewBox } from '../viewport.js';
+import { fmt } from '../layout/svgWriter.js';
 
 const MAX_SIDE = 4000;
 const DEBOUNCE_MS = 80;
@@ -59,9 +60,30 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     const state = {
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
         base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
-        timingMs: 0, messages: [], droppedBridges: 0,
+        timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false, fitted: false,
     };
     let timer = null;
+    // The shared viewport module (viewport.js) is one global singleton with no notion of
+    // "which tab last owned it": Layout's own show() unconditionally re-fits it to its sheet
+    // every time it's shown, and Preview does the same whenever an SVG is loaded there. A
+    // detour through either tab overwrites the pan/zoom Trace had, and there is no way to
+    // recover Trace's exact prior view afterwards - but a MutationObserver on the canvas's
+    // viewBox lets Trace tell "I changed this" (while `mode-trace` is the active body class,
+    // covering both its own re-renders and the user's manual zoom/pan while on this tab) apart
+    // from "something else changed this" (mutations while another tab is active), so it can at
+    // least fall back to a correct full-image fit instead of showing a nonsensical crop sized
+    // for whatever the other tab was displaying.
+    let needsRefit = false;
+    let lastOwnViewBox = null;
+    const viewBoxObserver = new MutationObserver(() => {
+        const current = canvas.getAttribute('viewBox');
+        if (document.body.classList.contains('mode-trace')) {
+            lastOwnViewBox = current;
+        } else if (lastOwnViewBox !== null && current !== lastOwnViewBox) {
+            needsRefit = true;
+        }
+    });
+    viewBoxObserver.observe(canvas, { attributes: true, attributeFilter: ['viewBox'] });
 
     function selectedPanel() {
         return state.panelName ? getPanels().find(p => p.name === state.panelName) : null;
@@ -86,7 +108,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         if (!state.result) return;
         if (state.view === 'raster') {
             renderOverlay(canvas, {
-                bitmap: state.edited, islands: state.result.islands, thin: state.result.thin,
+                bitmap: state.result.bitmap, islands: state.result.islands, thin: state.result.thin,
                 bridges: state.ops.filter(o => o.kind === 'bridge'), shapes: state.result.shapes,
                 selectedIsland: state.selectedIsland,
             });
@@ -94,6 +116,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
             const parsed = parseSVG(exportSvg(1));
             injectSVG(parsed, canvas);
             showPreview(canvas, createLayerState(parsed.layers), '#1a1a2e');
+            // injectSVG overwrote the viewBox from the SVG's own dimensions; re-apply the
+            // current zoom/pan instead of losing it, matching layoutUI.js's showSheet().
+            refreshViewBox();
         }
         btnVector.textContent = state.view === 'raster' ? 'Vector' : 'Raster';
     }
@@ -106,14 +131,11 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
             onBridge: (island) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() }),
             onDelete: (island) => pushOp({ kind: 'delete', seed: island.seed }),
         });
-        const msgs = [...state.messages];
+        const msgs = [...state.messages, ...state.regenerateMessages];
         if (r && r.islands.length) msgs.push({ level: 'warn', field: 'islands', message: `${r.islands.length} island(s) will fall out unless bridged.` });
-        if (state.droppedBridges) {
-            const n = state.droppedBridges;
-            msgs.push({ level: 'warn', field: 'islands', message: `${n} island${n === 1 ? '' : 's'} could not be bridged: no path to the body.` });
-        }
+        if (state.panelMissing) msgs.push({ level: 'warn', field: 'panel', message: 'The selected Layout panel no longer exists; using width instead.' });
         if (state.params.bridgeMm < state.params.kerfMm) msgs.push({ level: 'warn', field: 'bridgeMm', message: 'Bridge is narrower than the kerf; it may burn away.' });
-        renderMessages(messagesEl, msgs, { islands: 'Islands', bridgeMm: 'Bridge width', file: 'File', panel: 'Panel' });
+        renderMessages(messagesEl, msgs, { islands: 'Islands', bridgeMm: 'Bridge width', file: 'File', panel: 'Panel', trace: 'Trace' });
         renderStats(statsEl, r ? {
             width: state.edited.width, height: state.edited.height, contours: r.contours.length,
             segments: r.shapes.reduce((n, s) => n + s.outer.length + s.holes.reduce((m, h) => m + h.length, 0), 0),
@@ -131,20 +153,31 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
 
     function regenerate() {
         if (!state.imageData) { renderSidebar(); return; }
+        state.regenerateMessages = [];
         const t0 = performance.now();
-        state.scale = computeScale();
-        const tolerancePx = 0.5 + 2 * (state.params.smoothness / 100);
-        const kerfPx = state.params.kerfMm / state.scale;
-        state.base = imageToBitmap(state.imageData, { threshold: state.params.threshold, invert: state.params.invert });
-        const previousBridges = state.ops.filter(o => o.kind === 'bridge').length;
-        const replay = applyOps(state.base, state.ops);
-        state.ops = replay.ops;
-        const keptBridges = state.ops.filter(o => o.kind === 'bridge').length;
-        state.droppedBridges = Math.max(0, previousBridges - keptBridges);
-        state.edited = replay.bitmap;
-        state.result = tracePipeline(state.edited, { tolerancePx, kerfPx, minSpeckPx: state.params.minSpeck });
-        state.timingMs = performance.now() - t0;
-        if (state.selectedIsland >= state.result.islands.length) state.selectedIsland = -1;
+        try {
+            state.scale = computeScale();
+            const tolerancePx = 0.5 + 2 * (state.params.smoothness / 100);
+            const kerfPx = state.params.kerfMm / state.scale;
+            state.base = imageToBitmap(state.imageData, { threshold: state.params.threshold, invert: state.params.invert });
+            const replay = applyOps(state.base, state.ops);
+            state.ops = replay.ops;
+            // Only 'unreachable' is a genuine failure worth telling the user about; 'merged'
+            // and 'gone' mean the op is a no-op now (already part of the body, or its island
+            // no longer exists), not something that needs fixing.
+            const unreachable = replay.dropped.filter(d => d.reason === 'unreachable').length;
+            if (unreachable) {
+                state.regenerateMessages.push({ level: 'warn', field: 'islands', message: `${unreachable} island${unreachable === 1 ? '' : 's'} could not be bridged: no path to the body.` });
+            }
+            state.edited = replay.bitmap;
+            state.result = tracePipeline(state.edited, { tolerancePx, kerfPx, minSpeckPx: state.params.minSpeck });
+            state.timingMs = performance.now() - t0;
+            if (state.selectedIsland >= state.result.islands.length) state.selectedIsland = -1;
+        } catch (err) {
+            // Keep whatever state.result/edited already held (from the last successful run)
+            // visible rather than clearing them, so a bad parameter doesn't blank the canvas.
+            state.regenerateMessages.push({ level: 'error', field: 'trace', message: err.message });
+        }
         renderCanvas();
         renderSidebar();
     }
@@ -161,7 +194,13 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     }
 
     function renderForm() {
-        const onChange = (key, value) => { state.params[key] = value; scheduleRegenerate(); };
+        const onChange = (key, value) => {
+            state.params[key] = value;
+            // Bridge/delete op seeds are bitmap-pixel coordinates keyed to which side of the
+            // threshold is "black"; flipping invert makes every existing seed meaningless.
+            if (key === 'invert') state.ops = [];
+            scheduleRegenerate();
+        };
         renderParamInputs(imageList, IMAGE_PARAMS, state.params, onChange);
         renderParamInputs(checkList, CHECK_PARAMS, state.params, onChange);
         renderParamInputs(sizeList, SIZE_PARAMS, state.params, onChange);
@@ -173,12 +212,12 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         for (const p of panels) {
             const opt = document.createElement('option');
             opt.value = p.name;
-            opt.textContent = `${p.name} (${p.safeArea.width} x ${p.safeArea.height} mm)`;
+            opt.textContent = `${p.name} (${fmt(p.safeArea.width)} x ${fmt(p.safeArea.height)} mm)`;
             panelSelect.appendChild(opt);
         }
         if (state.panelName && !panels.some(p => p.name === state.panelName)) {
             state.panelName = '';
-            state.messages.push({ level: 'warn', field: 'panel', message: 'The selected Layout panel no longer exists; using width instead.' });
+            state.panelMissing = true;
         }
         panelSelect.value = state.panelName;
         const widthInput = document.getElementById('param-widthMm');
@@ -187,6 +226,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
 
     async function loadFile(file) {
         state.messages = [];
+        state.fitted = false;
         if (!file || !/^image\/(png|jpeg|webp)$/.test(file.type)) {
             state.messages.push({ level: 'error', field: 'file', message: 'Drop a PNG, JPG, or WebP image.' });
             renderSidebar();
@@ -221,12 +261,14 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         state.view = 'raster';
         regenerate();
         setInitialView({ x: 0, y: 0, width, height });
+        state.fitted = true;
     }
 
     btnOpen.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); fileInput.value = ''; });
     panelSelect.addEventListener('change', () => {
         state.panelName = panelSelect.value;
+        state.panelMissing = false;
         const widthInput = document.getElementById('param-widthMm');
         if (widthInput) widthInput.disabled = Boolean(state.panelName);
         regenerate();
@@ -257,8 +299,24 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     return {
         show() {
             refreshPanelSelect();
-            if (state.result) { regenerate(); setInitialView({ x: 0, y: 0, width: state.edited.width, height: state.edited.height }); }
-            else canvas.innerHTML = '';
+            if (state.result) {
+                // This never re-fits the view on its own - that happens exactly once per
+                // image, in loadFile - except in the one case where the viewBoxObserver above
+                // caught another tab changing the shared viewport since Trace last touched it:
+                // there is no Trace zoom left to preserve there, and showing whatever the
+                // other tab left behind would be a nonsensical crop.
+                if (needsRefit) {
+                    setInitialView({ x: 0, y: 0, width: state.edited.width, height: state.edited.height });
+                    needsRefit = false;
+                }
+                // A Layout edit may also have changed the selected panel's safe area, so only
+                // pay for a full regenerate() when a panel is actually driving the scale;
+                // otherwise just repaint what's already computed.
+                if (state.panelName) regenerate();
+                else { renderCanvas(); renderSidebar(); }
+            } else {
+                canvas.innerHTML = '';
+            }
         },
         loadFile,
         toggleView,

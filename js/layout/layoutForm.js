@@ -36,13 +36,16 @@ export function renderParamInputs(container, schema, values, onChange) {
             container.appendChild(row);
             continue;
         }
-        const input = el(doc, 'input', { type: 'number', id, min: def.min, step: def.step });
+        const attrs = { type: 'number', id, min: def.min, step: def.step };
+        if (def.max !== undefined) attrs.max = def.max;
+        const input = el(doc, 'input', attrs);
         input.value = String(values[def.key]);
         input.addEventListener('input', () => {
             const n = parseNumber(input, def.integer);
             const belowMin = n !== null && def.min !== undefined && n < def.min;
-            input.classList.toggle('invalid', n === null || belowMin);
-            if (n !== null && !belowMin) onChange(def.key, n);
+            const aboveMax = n !== null && def.max !== undefined && n > def.max;
+            input.classList.toggle('invalid', n === null || belowMin || aboveMax);
+            if (n !== null && !belowMin && !aboveMax) onChange(def.key, n);
         });
         row.appendChild(input);
         row.appendChild(el(doc, 'span', { className: 'unit' }, def.unit || ''));
