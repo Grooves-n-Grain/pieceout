@@ -6,7 +6,7 @@
 import { cloneBitmap } from './bitmap.js';
 import { labelComponents } from './components.js';
 
-export function stampDisc(bitmap, cx, cy, radius) {
+export function stampDisc(bitmap, cx, cy, radius, out) {
     const { width: W, height: H, data } = bitmap;
     const r = Math.max(0, radius);
     const R = Math.ceil(r);
@@ -16,7 +16,9 @@ export function stampDisc(bitmap, cx, cy, radius) {
             if (dx * dx + dy * dy > r2) continue;
             const x = cx + dx, y = cy + dy;
             if (x < 0 || y < 0 || x >= W || y >= H) continue;
-            data[y * W + x] = 1;
+            const i = y * W + x;
+            if (out && data[i] === 0) out.push(i);
+            data[i] = 1;
         }
     }
 }
@@ -60,8 +62,9 @@ export function bridgeIsland(bitmap, analysis, islandId, widthPx) {
     path.reverse();
     const out = cloneBitmap(bitmap);
     const radius = Math.max(0, widthPx / 2 - 0.5);
-    for (const [x, y] of path) stampDisc(out, x, y, radius);
-    return { bitmap: out, path };
+    const stamped = [];
+    for (const [x, y] of path) stampDisc(out, x, y, radius, stamped);
+    return { bitmap: out, path, stamped };
 }
 
 export function deleteIsland(bitmap, analysis, islandId) {
@@ -74,11 +77,19 @@ export function deleteIsland(bitmap, analysis, islandId) {
 export function applyOps(bitmap, ops) {
     let current = bitmap;
     const kept = [];
+    // Label once, then patch the analysis incrementally as ops are applied instead of
+    // relabelling the whole bitmap per op (that was O(ops * pixels), dominant cost on a
+    // large image with many ops). A delete leaves its island's old labels stale rather than
+    // clearing them: those pixels are now white, and every reader below (and bridgeIsland's
+    // BFS, which walls off other islands only when `data[j] === 1`) only trusts a label when
+    // the matching bitmap pixel is still black, so a stale label on a white pixel is inert.
+    const a = labelComponents(current, 1);
     for (const op of ops) {
-        const a = labelComponents(current, 1);
         const [x, y] = op.seed;
-        const id = x >= 0 && y >= 0 && x < current.width && y < current.height ? a.labels[y * current.width + x] : 0;
-        if (!id || a.touchesBorder[id]) continue;
+        const inBounds = x >= 0 && y >= 0 && x < current.width && y < current.height;
+        const idx = inBounds ? y * current.width + x : -1;
+        const id = inBounds ? a.labels[idx] : 0;
+        if (!id || a.touchesBorder[id] || current.data[idx] !== 1) continue;
         if (op.kind === 'delete') {
             current = deleteIsland(current, a, id);
             kept.push({ kind: 'delete', seed: op.seed });
@@ -86,6 +97,10 @@ export function applyOps(bitmap, ops) {
             const r = bridgeIsland(current, a, id, op.widthPx);
             if (!r) continue;
             current = r.bitmap;
+            // The island is now part of the body: its bridge pixels join its label, and the
+            // label is marked border-touching so later ops can path into it or target it.
+            for (const i of r.stamped) a.labels[i] = id;
+            a.touchesBorder[id] = true;
             kept.push({ kind: 'bridge', seed: op.seed, widthPx: op.widthPx, path: r.path });
         } else {
             throw new Error(`unknown op kind ${op.kind}`);
