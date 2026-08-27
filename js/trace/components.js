@@ -10,12 +10,17 @@
  * for black components (colour 1) only: if nothing touches the border, the
  * single largest black component is treated as the body instead (the frame
  * of the drawing), and everything else is still an island.
+ *
+ * A border-touching component smaller than minBodyAreaPx (a speck riding the
+ * edge of the frame) doesn't qualify as a body candidate either - it falls
+ * through to the same largest-component fallback as a component that never
+ * touched the border at all.
  */
 
 const N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-export function labelComponents(bitmap, colour) {
+export function labelComponents(bitmap, colour, minBodyAreaPx = 0) {
     if (colour !== 0 && colour !== 1) throw new Error(`colour must be 0 or 1, got ${colour}`);
     const { width: W, height: H, data } = bitmap;
     const labels = new Int32Array(W * H);
@@ -62,8 +67,8 @@ export function labelComponents(bitmap, colour) {
         seeds.push([start % W, (start - (start % W)) / W]);
     }
 
-    const body = touchesBorder.slice();
-    if (colour === 1 && count > 0 && !touchesBorder.some(Boolean)) {
+    const body = touchesBorder.map((touches, id) => touches && areas[id] >= minBodyAreaPx);
+    if (colour === 1 && count > 0 && !body.some(Boolean)) {
         let maxId = 1;
         for (let id = 2; id <= count; id++) if (areas[id] > areas[maxId]) maxId = id;
         body[maxId] = true;

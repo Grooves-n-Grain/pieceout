@@ -35,12 +35,14 @@ export function pathData(segments, scale) {
 
 export function tracePipeline(bitmap, { tolerancePx, kerfPx, minSpeckPx }) {
     const clean = removeSpecks(bitmap, minSpeckPx);
-    const black = labelComponents(clean, 1);
+    const black = labelComponents(clean, 1, minSpeckPx);
     const islands = findIslands(clean, black);
     const thin = findThinFeatures(clean, kerfPx);
     const contours = traceContours(clean);
     const shapes = buildShapes(contours, { tolerancePx });
-    return { bitmap: clean, black, islands, thin, contours, shapes };
+    let bodyArea = 0;
+    for (let id = 1; id <= black.count; id++) if (black.body[id]) bodyArea += black.areas[id];
+    return { bitmap: clean, black, islands, thin, contours, shapes, bodyArea };
 }
 
 function group(name, colour, dashed, elements) {
@@ -61,8 +63,13 @@ export function shapesToSVG({ shapes, widthPx, heightPx, scale, includeOutline, 
         guide.push(`<rect x="${fmt(t.bbox.x0 * scale)}" y="${fmt(t.bbox.y0 * scale)}" width="${fmt((t.bbox.x1 - t.bbox.x0 + 1) * scale)}" height="${fmt((t.bbox.y1 - t.bbox.y0 + 1) * scale)}" stroke="${COLORS.THIN}"/>`);
     }
     const cut = [];
-    if (includeOutline) cut.push(`<rect x="0" y="0" width="${W}" height="${H}"/>`);
+    // A white component that touches the border already has the image rectangle as its own
+    // outer loop, so its path below duplicates the perimeter - only add the separate rect when
+    // no shape supplies it that way. And with the outline off, that same border-touching shape
+    // must be skipped entirely, or panel mode would still cut a full-panel rectangle.
+    if (includeOutline && !shapes.some(s => s.touchesBorder)) cut.push(`<rect x="0" y="0" width="${W}" height="${H}"/>`);
     for (const shape of shapes) {
+        if (!includeOutline && shape.touchesBorder) continue;
         const d = [pathData(shape.outer, scale), ...shape.holes.map(h => pathData(h, scale))].join(' ');
         cut.push(`<path fill-rule="evenodd" d="${d}"/>`);
     }

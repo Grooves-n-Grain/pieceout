@@ -129,6 +129,41 @@ test('labelComponents never recurses (large blob)', () => {
     assert.equal(a.areas[1], size * size);
 });
 
+test('a border-touching speck under minBodyAreaPx does not defeat the body fallback', () => {
+    // 9x9: a 1px white margin, a 5x5 black frame (rows/cols 1..5) with a dot inside it, and a
+    // single black pixel riding the actual bitmap border at (8, 8) - a 1px "speck" that
+    // touches the border but is too small to count as a body candidate at minBodyAreaPx 4.
+    // Before this fix, that lone border touch alone would satisfy touchesBorder.some(Boolean)
+    // and suppress the largest-component fallback entirely, wrongly leaving the frame (which
+    // never touches the border, thanks to the margin) as just another island.
+    const framed = bitmapFromStrings([
+        '.........',
+        '.#####...',
+        '.#...#...',
+        '.#.#.#...',
+        '.#...#...',
+        '.#####...',
+        '.........',
+        '.........',
+        '........#',
+    ]);
+    const a = labelComponents(framed, 1, 4);
+    assert.equal(a.count, 3, 'frame, dot, and the border speck');
+    const frameId = a.areas.indexOf(16);
+    const speckId = a.bboxes.findIndex(b => b && b.x0 === 8 && b.y0 === 8);
+    const dotId = 6 - frameId - speckId; // the remaining id of {1, 2, 3}
+
+    assert.equal(a.touchesBorder[speckId], true, 'the speck really does touch the border');
+    assert.equal(a.body[speckId], false, 'too small to qualify as body despite touching the border');
+    assert.equal(a.body[frameId], true, 'the frame becomes the body via the largest-component fallback');
+    assert.equal(a.body[dotId], false);
+
+    // findIslands is unchanged: it still just asks `body`, so the disqualified speck - not
+    // being body - is still reported as its own (tiny) island alongside the enclosed dot.
+    const islands = findIslands(framed, a).map(isl => isl.id).sort();
+    assert.deepEqual(islands, [dotId, speckId].sort());
+});
+
 test('removeSpecks drops small black then small white components, never border-touching ones', () => {
     const bm = bitmapFromStrings([
         '#.......',
