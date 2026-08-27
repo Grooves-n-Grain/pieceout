@@ -160,7 +160,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             const tolerancePx = 0.5 + 2 * (state.params.smoothness / 100);
             const kerfPx = state.params.kerfMm / state.scale;
             state.base = imageToBitmap(state.imageData, { threshold: state.params.threshold, invert: state.params.invert });
-            const replay = applyOps(state.base, state.ops);
+            const replay = applyOps(state.base, state.ops, state.params.minSpeck);
             state.ops = replay.ops;
             // Only 'unreachable' is a genuine failure worth telling the user about; 'merged'
             // and 'gone' mean the op is a no-op now (already part of the body, or its island
@@ -170,6 +170,10 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
                 state.regenerateMessages.push({ level: 'warn', field: 'islands', message: `${unreachable} island${unreachable === 1 ? '' : 's'} could not be bridged: no path to the body.` });
             }
             state.edited = replay.bitmap;
+            // The clamp depends on the image size and current scale, both of which can have
+            // just changed (new image, new width, new panel); recompute it here so a stale
+            // clamp warning from a previous image doesn't linger, and a newly-needed one shows.
+            bridgePx();
             state.result = tracePipeline(state.edited, { tolerancePx, kerfPx, minSpeckPx: state.params.minSpeck });
             state.timingMs = performance.now() - t0;
             if (state.selectedIsland >= state.result.islands.length) state.selectedIsland = -1;
@@ -178,11 +182,13 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             // visible rather than clearing them, so a bad parameter doesn't blank the canvas.
             state.regenerateMessages.push({ level: 'error', field: 'trace', message: err.message });
         } finally {
+            // Render before dropping the busy state/re-enabling buttons, so a click that lands
+            // right after this finally runs never races the paint that's still in flight.
+            renderCanvas();
+            renderSidebar();
             document.body.classList.remove('trace-busy');
             setBusyButtons(false);
         }
-        renderCanvas();
-        renderSidebar();
     }
 
     function regenerate() {
@@ -339,7 +345,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             // already computed.
             if (state.result && (state.panelName || changed)) regenerate();
             else if (state.result) { renderCanvas(); renderSidebar(); }
-            else canvas.innerHTML = '';
+            else { canvas.innerHTML = ''; renderSidebar(); }
         },
         loadFile,
         toggleView,

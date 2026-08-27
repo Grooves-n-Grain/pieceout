@@ -100,7 +100,7 @@ function mergeDiagonalNeighbours(bitmap, analysis, stamped) {
     }
 }
 
-export function applyOps(bitmap, ops) {
+export function applyOps(bitmap, ops, minBodyAreaPx = 0) {
     let current = bitmap;
     const kept = [];
     const dropped = [];
@@ -114,7 +114,11 @@ export function applyOps(bitmap, ops) {
     // 8-connectivity, so that neighbour is now physically fused into the body even though it
     // keeps its own old label. That other label's `body` flag is patched to true below so a
     // later op on it in the same batch is dropped, matching what a full relabel would find.
-    const a = labelComponents(current, 1);
+    // minBodyAreaPx must match the speck threshold the rest of the pipeline uses (see
+    // removeSpecks/labelComponents in svg.js): otherwise a border-touching speck too small to
+    // survive despeckling could still be picked as the body here, changing what "the body" is
+    // for bridging purposes before it gets swept away.
+    const a = labelComponents(current, 1, minBodyAreaPx);
     for (const op of ops) {
         const [x, y] = op.seed;
         const inBounds = x >= 0 && y >= 0 && x < current.width && y < current.height;

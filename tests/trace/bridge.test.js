@@ -178,6 +178,39 @@ test('applyOps reports an unreachable bridge with reason "unreachable", not sile
     assert.deepEqual(r.dropped.map((d) => d.reason), ['unreachable']);
 });
 
+test('applyOps takes minBodyAreaPx for the body, matching the speck threshold the rest of the pipeline uses', () => {
+    // An 11x11 white-margin frame (a hollow ring, not touching the actual image border) with
+    // a 2x2 dot sealed inside it, plus a 1 px black speck sitting right on the image border.
+    // With no threshold, the border-touching speck alone qualifies as the body (any area >= 0),
+    // and the sealed ring walls the dot off from it - unreachable. Raise the threshold above
+    // the speck's area (1) and it no longer qualifies; the ring (the larger component) becomes
+    // the body via the largest-component fallback instead, and the dot can reach it directly.
+    const bm = bitmapFromStrings([
+        '.....#.....',
+        '...........',
+        '...........',
+        '...######..',
+        '...#....#..',
+        '...#.##.#..',
+        '...#.##.#..',
+        '...#....#..',
+        '...######..',
+        '...........',
+        '...........',
+    ]);
+    const dot = findIslands(bm).find((i) => i.area === 4);
+    assert.ok(dot, 'the enclosed 2x2 dot is found as an island');
+
+    const strict = applyOps(bm, [{ kind: 'bridge', seed: dot.seed, widthPx: 1 }], 0);
+    assert.equal(strict.ops.length, 0, 'the 1 px border speck alone qualifies as the body, walling the ring off');
+    assert.deepEqual(strict.dropped.map((d) => d.reason), ['unreachable']);
+
+    const withThreshold = applyOps(bm, [{ kind: 'bridge', seed: dot.seed, widthPx: 1 }], 4);
+    assert.equal(withThreshold.ops.length, 1, 'the speck no longer qualifies as body, so the larger ring does instead');
+    assert.equal(withThreshold.ops[0].kind, 'bridge');
+    assert.ok(withThreshold.ops[0].path.length > 0);
+});
+
 test('applyOps stays fast when bridging many islands on a large bitmap', () => {
     const W = 1000, H = 1000;
     const rows = [];
