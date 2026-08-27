@@ -148,3 +148,40 @@ test('applyOps stays fast when bridging many islands on a large bitmap', () => {
     assert.equal(findIslands(r.bitmap).length, 0);
     assert.ok(elapsed < 400, `applyOps took ${elapsed.toFixed(1)}ms, expected < 400ms`);
 });
+
+test('applyOps drops a delete for an island a bridge fused into the body diagonally', () => {
+    // A sits alone in a fully walled pocket whose only exit is a single gap; C sits just
+    // outside that gap, isolated, not touching the pocket wall or the border. Bridging A
+    // routes through the gap, and the stamped path pixel at the gap is 8-adjacent to C
+    // (and to the pocket wall itself), physically fusing both into the body even though
+    // neither was relabelled. A later delete on C must be dropped, not applied.
+    const bm = bitmapFromStrings([
+        '###############', // y0
+        '#.............#', // y1
+        '#.............#', // y2
+        '#....#####....#', // y3  pocket top wall
+        '#..#.#...#....#', // y4  C at x3; pocket left wall at x5
+        '#......#.#....#', // y5  A at x7; gap in the left wall at x5
+        '#....#...#....#', // y6
+        '#....#####....#', // y7  pocket bottom wall
+        '#.............#', // y8
+        '#.............#', // y9
+        '###############', // y10
+    ]);
+    const a0 = labelComponents(bm, 1);
+    const islands0 = findIslands(bm, a0);
+    const A = islands0.find((i) => i.seed[0] === 7 && i.seed[1] === 5);
+    const C = islands0.find((i) => i.seed[0] === 3 && i.seed[1] === 4);
+    assert.ok(A, 'island A found at its seed');
+    assert.ok(C, 'island C found at its seed');
+
+    const ops = [
+        { kind: 'bridge', seed: A.seed, widthPx: 1 },
+        { kind: 'delete', seed: C.seed },
+    ];
+    const r = applyOps(bm, ops);
+    assert.equal(r.ops.length, 1, 'the delete on C is dropped');
+    assert.equal(r.ops[0].kind, 'bridge');
+    assert.equal(getPixel(r.bitmap, 3, 4), 1, "C's pixels are still black");
+    assert.equal(findIslands(r.bitmap).length, 0);
+});

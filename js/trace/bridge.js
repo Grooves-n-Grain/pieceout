@@ -74,6 +74,30 @@ export function deleteIsland(bitmap, analysis, islandId) {
     return out;
 }
 
+// A bridge's stamped pixels can land 8-adjacent to a different island's pixels (black
+// uses 8-connectivity for adjacency, see components.js), physically fusing that island
+// into the body without ever relabelling it. Flag any such neighbour's label as
+// border-touching so a later op in the same batch treats it as no longer a standalone
+// island, matching what a fresh full relabel would find.
+function mergeDiagonalNeighbours(bitmap, analysis, stamped) {
+    const { width: W, height: H, data } = bitmap;
+    const { labels, touchesBorder } = analysis;
+    for (const i of stamped) {
+        const x = i % W, y = (i - x) / W;
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                if (dx === 0 && dy === 0) continue;
+                const nx = x + dx, ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                const n = ny * W + nx;
+                if (data[n] !== 1) continue;
+                const otherId = labels[n];
+                if (otherId && !touchesBorder[otherId]) touchesBorder[otherId] = true;
+            }
+        }
+    }
+}
+
 export function applyOps(bitmap, ops) {
     let current = bitmap;
     const kept = [];
@@ -83,6 +107,10 @@ export function applyOps(bitmap, ops) {
     // clearing them: those pixels are now white, and every reader below (and bridgeIsland's
     // BFS, which walls off other islands only when `data[j] === 1`) only trusts a label when
     // the matching bitmap pixel is still black, so a stale label on a white pixel is inert.
+    // A bridge's new material can also land 8-adjacent to a *different* island: black uses
+    // 8-connectivity, so that neighbour is now physically fused into the body even though it
+    // keeps its own old label. That other label's touchesBorder is patched to true below so a
+    // later op on it in the same batch is dropped, matching what a full relabel would find.
     const a = labelComponents(current, 1);
     for (const op of ops) {
         const [x, y] = op.seed;
@@ -101,6 +129,7 @@ export function applyOps(bitmap, ops) {
             // label is marked border-touching so later ops can path into it or target it.
             for (const i of r.stamped) a.labels[i] = id;
             a.touchesBorder[id] = true;
+            mergeDiagonalNeighbours(current, a, r.stamped);
             kept.push({ kind: 'bridge', seed: op.seed, widthPx: op.widthPx, path: r.path });
         } else {
             throw new Error(`unknown op kind ${op.kind}`);
