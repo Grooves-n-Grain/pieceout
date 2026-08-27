@@ -53,6 +53,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     const fileInput = $('trace-file-input');
     const btnOpen = $('btn-trace-open');
     const btnBridgeAll = $('btn-bridge-all');
+    const btnDeleteAll = $('btn-delete-all');
     const btnUndo = $('btn-trace-undo');
     const btnVector = $('btn-trace-vector');
     const btnExport = $('btn-trace-export');
@@ -137,7 +138,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         } : {});
         const ready = Boolean(r);
         btnExport.disabled = btnSend.disabled = btnVector.disabled = !ready;
-        btnBridgeAll.disabled = !ready || !r.islands.length;
+        btnBridgeAll.disabled = btnDeleteAll.disabled = !ready || !r.islands.length;
         btnUndo.disabled = !state.ops.length;
     }
 
@@ -153,7 +154,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     }
 
     function setBusyButtons(disabled) {
-        for (const btn of [btnBridgeAll, btnUndo, btnVector, btnExport, btnSend, ...islandsEl.querySelectorAll('button')]) {
+        for (const btn of [btnBridgeAll, btnDeleteAll, btnUndo, btnVector, btnExport, btnSend, ...islandsEl.querySelectorAll('button')]) {
             btn.disabled = disabled;
         }
     }
@@ -320,6 +321,12 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     btnBridgeAll.addEventListener('click', () => {
         if (!state.result) return;
         for (const island of state.result.islands) state.ops.push({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() });
+        state.selectedIsland = -1;
+        regenerate();
+    });
+    btnDeleteAll.addEventListener('click', () => {
+        if (!state.result) return;
+        for (const island of state.result.islands) state.ops.push({ kind: 'delete', seed: island.seed });
         state.selectedIsland = -1;
         regenerate();
     });
