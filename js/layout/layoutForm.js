@@ -27,6 +27,15 @@ export function renderParamInputs(container, schema, values, onChange) {
         const row = el(doc, 'div', { className: 'param-row' });
         const id = `param-${def.key}`;
         row.appendChild(el(doc, 'label', { for: id }, def.label));
+        if (def.type === 'boolean') {
+            const box = el(doc, 'input', { type: 'checkbox', id });
+            box.checked = Boolean(values[def.key]);
+            box.addEventListener('change', () => onChange(def.key, box.checked));
+            row.appendChild(box);
+            row.appendChild(el(doc, 'span', { className: 'unit' }, ''));
+            container.appendChild(row);
+            continue;
+        }
         const input = el(doc, 'input', { type: 'number', id, min: def.min, step: def.step });
         input.value = String(values[def.key]);
         input.addEventListener('input', () => {

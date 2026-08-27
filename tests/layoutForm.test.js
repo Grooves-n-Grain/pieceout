@@ -92,6 +92,19 @@ test('renderDerived disables inputs until overridden', () => {
     assert.deepEqual(changes, [['legLength', 174.6], ['legLength', 180], ['legLength', undefined]]);
 });
 
+test('renderParamInputs renders boolean rows as checkboxes', () => {
+    const doc = fakeDocument();
+    const container = doc.createElement('div');
+    const changes = [];
+    renderParamInputs(container, [{ key: 'invert', label: 'Invert', group: 'image', type: 'boolean', default: false }], { invert: false }, (k, v) => changes.push([k, v]));
+    const box = container.querySelector('#param-invert');
+    assert.equal(box.getAttribute('type'), 'checkbox');
+    assert.equal(box.checked, false);
+    box.checked = true;
+    box.dispatch('change');
+    assert.deepEqual(changes, [['invert', true]]);
+});
+
 test('renderMessages and markInvalid', () => {
     const doc = fakeDocument();
     const form = doc.createElement('div');

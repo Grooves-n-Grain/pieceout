@@ -50,6 +50,7 @@ export function initLayout({ canvas, onSendToPreview }) {
         machine: pickKnown(defaultMachine(), saved?.machine),
         sheets: [],
         svgs: [],
+        parts: [],
         sheetIndex: 0,
         lastShown: null, // `${index}:${w}x${h}` of the sheet last fitted to view
     };
@@ -156,6 +157,7 @@ export function initLayout({ canvas, onSendToPreview }) {
         if (!hasErrors) {
             try {
                 const parts = state.template.build(state.params, derived);
+                state.parts = parts;
                 state.sheets = nest(parts, state.machine);
                 state.svgs = state.sheets.map(sheetToSVG);
             } catch (err) {
@@ -165,6 +167,7 @@ export function initLayout({ canvas, onSendToPreview }) {
                     message: err.message,
                 });
                 hasErrors = true;
+                state.parts = [];
                 state.sheets = [];
                 state.svgs = [];
             }
@@ -224,6 +227,17 @@ export function initLayout({ canvas, onSendToPreview }) {
         show() {
             state.lastShown = null;
             showSheet();
+        },
+        getPanels() {
+            return state.parts
+                .filter(p => p.material === 'basswood')
+                .map(p => {
+                    const guide = p.features.find(f => f.layer === 'GUIDE' && f.shape.kind === 'rect');
+                    const safeArea = guide
+                        ? { x: guide.shape.x, y: guide.shape.y, width: guide.shape.width, height: guide.shape.height }
+                        : { x: 0, y: 0, width: p.width, height: p.height };
+                    return { name: p.name, width: p.width, height: p.height, safeArea };
+                });
         },
     };
 }
