@@ -71,7 +71,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     const state = {
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
         base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
-        timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false, bridgeClampPx: null,
+        timingMs: 0, messages: [], regenerateMessages: [], opWarnings: [], panelMissing: false, bridgeClampPx: null,
         numbering: createNumbering(), kept: new Set(), popover: null, placing: null,
     };
     let timer = null;
@@ -257,15 +257,21 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         // A per-island width that gets clamped is a one-off event worth a one-shot warning, not
         // the persistent "Bridge width clamped" message bridgePx() maintains for the global
         // Bridge width setting - clampBridgePx never writes to state, so it can't clobber that.
+        const clampWarning = (px) => `Bridge width clamped to ${px} px for this image.`;
         const warnIfClamped = (widthMm) => {
             const { px, clamped } = clampBridgePx(widthMm);
-            if (clamped) pushClickWarning(`Bridge width clamped to ${px} px for this image.`);
+            if (clamped) pushClickWarning(clampWarning(px));
             return px;
         };
         renderIslandPopover(popoverEl, { ...island, mm2 }, {
             bridgeMm: state.params.bridgeMm,
             kept: Boolean(island.kept),
-            onBridge: (widthMm) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: warnIfClamped(widthMm) }),
+            // Bridge regenerates straight away, which resets regenerateMessages, so its clamp
+            // warning rides along with the op instead of being pushed (and wiped) up front.
+            onBridge: (widthMm) => {
+                const { px, clamped } = clampBridgePx(widthMm);
+                pushOp({ kind: 'bridge', seed: island.seed, widthPx: px }, clamped ? clampWarning(px) : null);
+            },
             onPlace: (widthMm) => startPlacing(island, warnIfClamped(widthMm)),
             onDelete: () => pushOp({ kind: 'delete', seed: island.seed }),
             onKeep: () => toggleKeep(island),
@@ -310,7 +316,8 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     }
 
     function runPipeline() {
-        state.regenerateMessages = [];
+        // Warnings queued by pushOp for this run survive the reset; everything older is dropped.
+        state.regenerateMessages = state.opWarnings.splice(0);
         const t0 = performance.now();
         try {
             state.scale = computeScale();
@@ -398,8 +405,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         timer = setTimeout(regenerate, DEBOUNCE_MS);
     }
 
-    function pushOp(op) {
+    function pushOp(op, warning = null) {
         state.ops.push(op);
+        if (warning) state.opWarnings.push({ level: 'warn', field: 'islands', message: warning });
         // An explicit bridge or delete on an island wins over a prior keep: there's no point
         // keeping an island the user just told the pipeline to bridge or remove.
         state.kept.delete(seedKey(op.seed));
