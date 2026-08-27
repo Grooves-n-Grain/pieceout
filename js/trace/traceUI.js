@@ -185,9 +185,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             // Render before dropping the busy state/re-enabling buttons, so a click that lands
             // right after this finally runs never races the paint that's still in flight.
             renderCanvas();
-            renderSidebar();
             document.body.classList.remove('trace-busy');
             setBusyButtons(false);
+            renderSidebar();
         }
     }
 
