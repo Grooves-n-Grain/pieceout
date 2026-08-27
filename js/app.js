@@ -109,6 +109,8 @@ function loadFile(file) {
 }
 
 function loadSVGContent(svgText) {
+    // Mutates the shared viewport via setInitialView below, so callers must switch to Preview
+    // first: mutate the viewport only while the owning tab is active.
     parsedSVG = parseSVG(svgText);
 
     // Hide drop zone
@@ -127,6 +129,10 @@ function loadSVGContent(svgText) {
     // Set viewport — pass canvas for accurate content bounds via getBBox()
     const bounds = getSVGBounds(parsedSVG, canvas);
     setInitialView(bounds);
+    // A newly loaded SVG always gets this fresh fit; discard any stale saved Preview view so
+    // it can never be restored over the new content on some later tab switch. The user's next
+    // zoom is captured normally when they leave Preview again.
+    delete tabViews.preview;
 
     // Apply current view mode
     applyView();
@@ -315,8 +321,10 @@ initViewport(canvas);
 const layout = initLayout({
     canvas,
     onSendToPreview: (svgText) => {
-        loadSVGContent(svgText);
+        // Switch tabs first: loadSVGContent mutates the shared viewport, and it must do so
+        // while Preview is already the active tab (see the comment on loadSVGContent).
         setTab('preview');
+        loadSVGContent(svgText);
     },
 });
 
@@ -324,8 +332,8 @@ const trace = initTrace({
     canvas,
     getPanels: () => layout.getPanels(),
     onSendToPreview: (svgText) => {
-        loadSVGContent(svgText);
         setTab('preview');
+        loadSVGContent(svgText);
     },
 });
 
