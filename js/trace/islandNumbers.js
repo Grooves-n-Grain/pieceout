@@ -7,7 +7,7 @@
  * retired, never reused - the next new island always gets the next unused number.
  */
 
-function seedKey(seed) {
+export function seedKey(seed) {
     return seed[0] + ',' + seed[1];
 }
 

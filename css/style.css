@@ -533,6 +533,11 @@ body.mode-trace #drop-zone {
     background: rgba(245, 166, 35, 0.12);
 }
 
+.msg-info {
+    color: var(--tag-pocket);
+    background: rgba(74, 158, 255, 0.12);
+}
+
 #layout-footer {
     padding: 8px 16px;
     border-top: 1px solid var(--border);

@@ -9,6 +9,7 @@ import { labelComponents } from './components.js';
 import { tracePipeline, shapesToSVG } from './svg.js';
 import { renderOverlay } from './overlay.js';
 import { createNumbering } from './islandNumbers.js';
+import { removeSmallIslands } from './sizeRule.js';
 import { renderIslandList, renderStats } from './traceSidebar.js';
 import { renderParamInputs, renderMessages } from '../layout/layoutForm.js';
 import { downloadText } from '../layout/download.js';
@@ -30,6 +31,7 @@ const IMAGE_PARAMS = [
 const CHECK_PARAMS = [
     { key: 'kerfMm', label: 'Kerf / bit', default: 0.3, min: 0, max: 10, step: 0.05, unit: 'mm' },
     { key: 'bridgeMm', label: 'Bridge width', default: 1.5, min: 0.2, max: 10, step: 0.1, unit: 'mm' },
+    { key: 'minIslandMm2', label: 'Delete islands under', default: 0, min: 0, max: 10000, step: 0.5, unit: 'mm2' },
 ];
 const SIZE_PARAMS = [
     { key: 'widthMm', label: 'Width', default: 100, min: 5, max: 2000, step: 1, unit: 'mm' },
@@ -194,6 +196,18 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             // just changed (new image, new width, new panel); recompute it here so a stale
             // clamp warning from a previous image doesn't linger, and a newly-needed one shows.
             bridgePx();
+            // Size rule runs after ops replay so an island the user already bridged is body and
+            // exempt for free, one they already deleted is gone anyway, and a kept island is
+            // exempt by key - none of that needs special-casing here.
+            const minAreaPx = state.params.minIslandMm2 > 0 ? state.params.minIslandMm2 / (state.scale * state.scale) : 0;
+            const sized = removeSmallIslands(state.edited, { minAreaPx, minSpeckPx: state.params.minSpeck });
+            state.edited = sized.bitmap;
+            if (sized.removed > 0) {
+                state.regenerateMessages.push({
+                    level: 'info', field: 'islands',
+                    message: `${sized.removed} island${sized.removed === 1 ? '' : 's'} under ${state.params.minIslandMm2} mm2 removed by the size rule.`,
+                });
+            }
             state.result = tracePipeline(state.edited, { tolerancePx, kerfPx, minSpeckPx: state.params.minSpeck });
             state.result.islands = state.numbering.assign(state.result.islands);
             state.timingMs = performance.now() - t0;
