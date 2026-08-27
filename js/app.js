@@ -13,7 +13,7 @@ import {
     setMaterialColor, exportPNG,
 } from './renderer.js';
 import {
-    initViewport, setInitialView, zoomIn, zoomOut, zoomFit,
+    initViewport, setInitialView, zoomIn, zoomOut, zoomFit, getView, setView,
 } from './viewport.js';
 import { initLayout } from './layout/layoutUI.js';
 import { initTrace } from './trace/traceUI.js';
@@ -31,6 +31,7 @@ const viewport = document.getElementById('viewport');
 const layerListEl = document.getElementById('layer-list');
 
 let activeTab = 'preview'; // 'preview' | 'layout'
+const tabViews = {}; // per-tab saved pan/zoom, keyed by tab name
 const tabButtons = document.querySelectorAll('.tab-btn');
 
 const btnWireframe = document.getElementById('btn-wireframe');
@@ -162,6 +163,10 @@ function getBackgroundColor() {
 // --- Tabs ---
 
 function setTab(tab) {
+    // Remember the tab we're leaving's own pan/zoom before switching away from it - the
+    // canvas and its viewBox are shared by all three tabs, so without this every switch would
+    // silently lose whatever view the previous tab had.
+    if (activeTab !== tab) tabViews[activeTab] = getView();
     activeTab = tab;
     document.body.classList.toggle('mode-preview', tab === 'preview');
     document.body.classList.toggle('mode-layout', tab === 'layout');
@@ -183,6 +188,10 @@ function setTab(tab) {
     } else {
         trace.show();
     }
+
+    // Restore this tab's own view over whatever it just fitted to on entry (a first-ever
+    // visit has nothing saved yet, so its own fit stands).
+    if (tabViews[tab]) setView(tabViews[tab]);
 }
 
 tabButtons.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));

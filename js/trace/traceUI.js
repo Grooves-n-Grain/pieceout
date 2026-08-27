@@ -60,30 +60,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     const state = {
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
         base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
-        timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false, fitted: false,
+        timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false,
     };
     let timer = null;
-    // The shared viewport module (viewport.js) is one global singleton with no notion of
-    // "which tab last owned it": Layout's own show() unconditionally re-fits it to its sheet
-    // every time it's shown, and Preview does the same whenever an SVG is loaded there. A
-    // detour through either tab overwrites the pan/zoom Trace had, and there is no way to
-    // recover Trace's exact prior view afterwards - but a MutationObserver on the canvas's
-    // viewBox lets Trace tell "I changed this" (while `mode-trace` is the active body class,
-    // covering both its own re-renders and the user's manual zoom/pan while on this tab) apart
-    // from "something else changed this" (mutations while another tab is active), so it can at
-    // least fall back to a correct full-image fit instead of showing a nonsensical crop sized
-    // for whatever the other tab was displaying.
-    let needsRefit = false;
-    let lastOwnViewBox = null;
-    const viewBoxObserver = new MutationObserver(() => {
-        const current = canvas.getAttribute('viewBox');
-        if (document.body.classList.contains('mode-trace')) {
-            lastOwnViewBox = current;
-        } else if (lastOwnViewBox !== null && current !== lastOwnViewBox) {
-            needsRefit = true;
-        }
-    });
-    viewBoxObserver.observe(canvas, { attributes: true, attributeFilter: ['viewBox'] });
 
     function selectedPanel() {
         return state.panelName ? getPanels().find(p => p.name === state.panelName) : null;
@@ -226,7 +205,6 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
 
     async function loadFile(file) {
         state.messages = [];
-        state.fitted = false;
         if (!file || !/^image\/(png|jpeg|webp)$/.test(file.type)) {
             state.messages.push({ level: 'error', field: 'file', message: 'Drop a PNG, JPG, or WebP image.' });
             renderSidebar();
@@ -261,7 +239,6 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
         state.view = 'raster';
         regenerate();
         setInitialView({ x: 0, y: 0, width, height });
-        state.fitted = true;
     }
 
     btnOpen.addEventListener('click', () => fileInput.click());
@@ -299,24 +276,14 @@ export function initTrace({ canvas, getPanels, onSendToPreview }) {
     return {
         show() {
             refreshPanelSelect();
-            if (state.result) {
-                // This never re-fits the view on its own - that happens exactly once per
-                // image, in loadFile - except in the one case where the viewBoxObserver above
-                // caught another tab changing the shared viewport since Trace last touched it:
-                // there is no Trace zoom left to preserve there, and showing whatever the
-                // other tab left behind would be a nonsensical crop.
-                if (needsRefit) {
-                    setInitialView({ x: 0, y: 0, width: state.edited.width, height: state.edited.height });
-                    needsRefit = false;
-                }
-                // A Layout edit may also have changed the selected panel's safe area, so only
-                // pay for a full regenerate() when a panel is actually driving the scale;
-                // otherwise just repaint what's already computed.
-                if (state.panelName) regenerate();
-                else { renderCanvas(); renderSidebar(); }
-            } else {
-                canvas.innerHTML = '';
-            }
+            // app.js now owns remembering and restoring each tab's own pan/zoom across a tab
+            // switch (see setTab in app.js), so this never calls setInitialView itself - that
+            // happens exactly once per image, in loadFile. A panel may have changed its safe
+            // area since we were last shown, so only pay for a full regenerate() when a panel
+            // is actually driving the scale; otherwise just repaint what's already computed.
+            if (state.result && state.panelName) regenerate();
+            else if (state.result) { renderCanvas(); renderSidebar(); }
+            else canvas.innerHTML = '';
         },
         loadFile,
         toggleView,

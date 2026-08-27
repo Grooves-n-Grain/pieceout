@@ -171,6 +171,23 @@ export function refreshViewBox() {
     applyViewBox();
 }
 
+/**
+ * Get a shallow copy of the current viewState (pan/zoom plus the original
+ * fit-to-view bounds). Lets a caller remember one tab's view and restore it
+ * later without this module needing any notion of "tabs" itself.
+ */
+export function getView() {
+    return { ...viewState };
+}
+
+/**
+ * Replace viewState with a copy of the given view and apply it immediately.
+ */
+export function setView(view) {
+    viewState = { ...view };
+    applyViewBox();
+}
+
 // --- Internal handlers ---
 
 function onWheel(e) {
