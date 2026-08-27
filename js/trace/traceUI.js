@@ -8,7 +8,7 @@ import { applyOps, bridgeIslandTo } from './bridge.js';
 import { labelComponents } from './components.js';
 import { tracePipeline, shapesToSVG } from './svg.js';
 import { renderOverlay } from './overlay.js';
-import { createNumbering } from './islandNumbers.js';
+import { createNumbering, seedKey, bulkTargets } from './islandNumbers.js';
 import { removeSmallIslands } from './sizeRule.js';
 import { renderIslandList, renderStats } from './traceSidebar.js';
 import { renderParamInputs, renderMessages } from '../layout/layoutForm.js';
@@ -66,7 +66,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
         base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
         timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false, bridgeClampPx: null,
-        numbering: createNumbering(),
+        numbering: createNumbering(), kept: new Set(),
     };
     let timer = null;
 
@@ -122,9 +122,17 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             onSelect: (island) => selectIsland(island.number),
             onBridge: (island) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() }),
             onDelete: (island) => pushOp({ kind: 'delete', seed: island.seed }),
+            onKeep: (island) => toggleKeep(island),
         });
         const msgs = [...state.messages, ...state.regenerateMessages];
-        if (r && r.islands.length) msgs.push({ level: 'warn', field: 'islands', message: `${r.islands.length} island(s) will fall out unless bridged.` });
+        if (r && r.islands.length) {
+            const targets = bulkTargets(r.islands);
+            const keptCount = r.islands.length - targets.length;
+            if (targets.length) {
+                const suffix = keptCount ? ` (${keptCount} kept)` : '';
+                msgs.push({ level: 'warn', field: 'islands', message: `${targets.length} island(s) will fall out unless bridged.${suffix}` });
+            }
+        }
         // Islands are now sorted by number, not size, so find the largest by area explicitly.
         // If it outweighs the whole body, the threshold or invert setting is almost certainly
         // backwards (black and white got swapped) rather than there being a genuinely huge
@@ -147,8 +155,24 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         } : {});
         const ready = Boolean(r);
         btnExport.disabled = btnSend.disabled = btnVector.disabled = !ready;
-        btnBridgeAll.disabled = btnDeleteAll.disabled = !ready || !r.islands.length;
+        btnBridgeAll.disabled = btnDeleteAll.disabled = !ready || !bulkTargets(r.islands).length;
         btnUndo.disabled = !state.ops.length;
+    }
+
+    // Flips whether an island is kept as a separate piece rather than bridged/deleted. Kept
+    // islands are annotated straight onto state.result.islands so the list and overlay pick it
+    // up immediately; a full regenerate is only needed when the size rule is active, since kept
+    // changes what that rule would otherwise remove.
+    function toggleKeep(island) {
+        const key = seedKey(island.seed);
+        if (state.kept.has(key)) state.kept.delete(key);
+        else state.kept.add(key);
+        if (state.params.minIslandMm2 > 0) { regenerate(); return; }
+        if (state.result) {
+            state.result.islands = state.result.islands.map((isl) => ({ ...isl, kept: state.kept.has(seedKey(isl.seed)) }));
+        }
+        renderCanvas();
+        renderSidebar();
     }
 
     function bridgePx() {
@@ -200,7 +224,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             // exempt for free, one they already deleted is gone anyway, and a kept island is
             // exempt by key - none of that needs special-casing here.
             const minAreaPx = state.params.minIslandMm2 > 0 ? state.params.minIslandMm2 / (state.scale * state.scale) : 0;
-            const sized = removeSmallIslands(state.edited, { minAreaPx, minSpeckPx: state.params.minSpeck });
+            const sized = removeSmallIslands(state.edited, { minAreaPx, minSpeckPx: state.params.minSpeck, keptKeys: state.kept });
             state.edited = sized.bitmap;
             if (sized.removed > 0) {
                 state.regenerateMessages.push({
@@ -209,7 +233,12 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
                 });
             }
             state.result = tracePipeline(state.edited, { tolerancePx, kerfPx, minSpeckPx: state.params.minSpeck });
-            state.result.islands = state.numbering.assign(state.result.islands);
+            // Numbering keys islands by seed, same as the kept set, so annotate kept status here
+            // once numbers are stable rather than threading it through the pipeline itself. Keys
+            // are never pruned when their island disappears (a threshold nudge may bring it back
+            // with the same seed), matching how numbering itself never retires a key either.
+            state.result.islands = state.numbering.assign(state.result.islands)
+                .map((island) => ({ ...island, kept: state.kept.has(seedKey(island.seed)) }));
             state.timingMs = performance.now() - t0;
             if (!state.result.islands.some(i => i.number === state.selectedIsland)) state.selectedIsland = -1;
         } catch (err) {
@@ -243,6 +272,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
 
     function pushOp(op) {
         state.ops.push(op);
+        // An explicit bridge or delete on an island wins over a prior keep: there's no point
+        // keeping an island the user just told the pipeline to bridge or remove.
+        state.kept.delete(seedKey(op.seed));
         state.selectedIsland = -1;
         regenerate();
     }
@@ -323,11 +355,13 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         state.params[key] = value;
         // Bridge/delete op seeds are bitmap-pixel coordinates keyed to which side of the
         // threshold is "black"; flipping invert makes every existing seed meaningless. The
-        // island numbering is keyed to seeds too, so restart it or old numbers could resurface
-        // on unrelated islands once the ops that anchored them are gone.
+        // island numbering and kept set are keyed to seeds too, so reset them or old numbers/
+        // kept flags could resurface on unrelated islands once the ops that anchored them
+        // are gone.
         if (key === 'invert') {
             state.ops = [];
             state.numbering = createNumbering();
+            state.kept = new Set();
         }
         scheduleRegenerate();
     }
@@ -405,6 +439,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         state.ops = [];
         state.selectedIsland = -1;
         state.numbering = createNumbering();
+        state.kept = new Set();
         state.view = 'raster';
         regenerate();
         setInitialView({ x: 0, y: 0, width, height });
@@ -424,13 +459,13 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     });
     btnBridgeAll.addEventListener('click', () => {
         if (!state.result) return;
-        for (const island of state.result.islands) state.ops.push({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() });
+        for (const island of bulkTargets(state.result.islands)) state.ops.push({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() });
         state.selectedIsland = -1;
         regenerate();
     });
     btnDeleteAll.addEventListener('click', () => {
         if (!state.result) return;
-        for (const island of state.result.islands) state.ops.push({ kind: 'delete', seed: island.seed });
+        for (const island of bulkTargets(state.result.islands)) state.ops.push({ kind: 'delete', seed: island.seed });
         state.selectedIsland = -1;
         regenerate();
     });

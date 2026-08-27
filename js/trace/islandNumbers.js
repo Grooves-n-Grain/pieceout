@@ -31,3 +31,12 @@ export function createNumbering() {
 
     return { assign };
 }
+
+/**
+ * Which islands a bulk op (Bridge all / Delete all) applies to: everything except an island
+ * the user has explicitly marked "kept" as a separate piece. Pulled out as its own pure
+ * function so both the button handlers and their disabled-state checks agree on the same rule.
+ */
+export function bulkTargets(islands) {
+    return islands.filter((island) => !island.kept);
+}

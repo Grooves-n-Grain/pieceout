@@ -69,14 +69,25 @@ export function renderOverlay(canvas, { bitmap, islands, thin, bridges, shapes, 
 
     const islandGroup = el('g', { id: 'trace-islands-overlay' });
     islands.forEach((island) => {
-        const rect = bboxRect(island.bbox, 'trace-island-mark', { 'data-island-number': island.number });
+        const markClass = 'trace-island-mark' + (island.kept ? ' kept' : '');
+        const rect = bboxRect(island.bbox, markClass, { 'data-island-number': island.number });
         if (island.number === selectedIsland) rect.setAttribute('stroke-width', '3');
         islandGroup.appendChild(rect);
         const fontSize = Math.max(8, Math.round(W / 80));
+        const labelClass = 'trace-island-label' + (island.kept ? ' kept' : '');
         islandGroup.appendChild(el('text', {
-            x: island.bbox.x1 + 2, y: island.bbox.y0 + fontSize, class: 'trace-island-label',
+            x: island.bbox.x1 + 2, y: island.bbox.y0 + fontSize, class: labelClass,
             'font-size': fontSize, 'data-island-number': island.number,
         }, String(island.number)));
+        if (island.kept) {
+            // A small pin marker at the bbox's top-left corner, on top of the muted grey mark,
+            // so a kept island still reads as distinct at a glance even before its label is read.
+            const pinR = Math.max(2, W / 300);
+            islandGroup.appendChild(el('circle', {
+                cx: island.bbox.x0, cy: island.bbox.y0, r: pinR, class: 'trace-island-pin',
+                'data-island-number': island.number,
+            }));
+        }
     });
     canvas.appendChild(islandGroup);
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createNumbering } from '../../js/trace/islandNumbers.js';
+import { createNumbering, seedKey, bulkTargets } from '../../js/trace/islandNumbers.js';
 
 function island(id, seed, area = 10) {
     return { id, area, bbox: { x0: 0, y0: 0, x1: 0, y1: 0 }, seed };
@@ -77,4 +77,21 @@ test('the returned array is sorted by number and does not mutate the input', () 
     // Input array/objects must be untouched.
     assert.deepEqual(input, inputSnapshot);
     assert.equal('number' in input[0], false);
+});
+
+test('seedKey formats a [x, y] seed as "x,y"', () => {
+    assert.equal(seedKey([5, 12]), '5,12');
+    assert.equal(seedKey([0, 0]), '0,0');
+});
+
+test('bulkTargets returns only the non-kept islands', () => {
+    const a = { ...island(1, [1, 1]), kept: false };
+    const b = { ...island(2, [2, 2]), kept: true };
+    const c = { ...island(3, [3, 3]), kept: false };
+    assert.deepEqual(bulkTargets([a, b, c]), [a, c]);
+});
+
+test('bulkTargets treats a missing kept flag as not kept', () => {
+    const a = island(1, [1, 1]);
+    assert.deepEqual(bulkTargets([a]), [a]);
 });

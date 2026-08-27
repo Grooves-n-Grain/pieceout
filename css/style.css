@@ -629,7 +629,7 @@ body.mode-trace #drop-zone {
 
 .island-row {
     display: grid;
-    grid-template-columns: 24px 1fr auto auto;
+    grid-template-columns: 24px 1fr auto auto auto;
     align-items: center;
     gap: 6px;
     padding: 3px 0;
@@ -644,6 +644,12 @@ body.mode-trace #drop-zone {
 .island-row.selected {
     background: rgba(233, 69, 96, 0.12);
     border-radius: 3px;
+}
+
+/* A kept island is left as a separate piece on purpose, not a bridging failure - muted grey
+   instead of the alarm red used for a plain island. */
+.island-row.kept .island-index {
+    color: #94a3b8;
 }
 
 #trace-stats {
@@ -661,6 +667,9 @@ body.mode-trace #drop-zone {
 /* Overlay colours on the shared canvas */
 .trace-island-mark { fill: rgba(233, 69, 96, 0.35); stroke: #e94560; stroke-width: 1; cursor: pointer; }
 .trace-island-label { fill: #e94560; font-family: sans-serif; cursor: pointer; }
+.trace-island-mark.kept { fill: rgba(148, 163, 184, 0.25); stroke: #94a3b8; }
+.trace-island-label.kept { fill: #94a3b8; }
+.trace-island-pin { fill: #94a3b8; }
 .trace-thin-mark { fill: rgba(245, 166, 35, 0.35); stroke: #f5a623; stroke-width: 1; }
 .trace-bridge { fill: none; stroke: #4ade80; stroke-width: 2; stroke-linecap: round; }
 .trace-contour { fill: none; stroke: #22d3ee; stroke-width: 0.8; }
@@ -757,6 +766,7 @@ body.mode-trace #drop-zone {
 }
 
 .legend-swatch.island { background: rgba(233, 69, 96, 0.35); border: 1px solid #e94560; }
+.legend-swatch.island.kept { background: rgba(148, 163, 184, 0.25); border: 1px solid #94a3b8; }
 .legend-swatch.thin { background: rgba(245, 166, 35, 0.35); border: 1px solid #f5a623; }
 .legend-swatch.bridge { background: #4ade80; }
 .legend-swatch.contour { background: #22d3ee; }
