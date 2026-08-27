@@ -264,6 +264,29 @@ test('bridgeIslandTo returns null for a target that is not a body pixel', () => 
     assert.equal(bridgeIslandTo(bm, a, island.id, [-1, 3], 1), null);
 });
 
+test('bridgeIslandTo returns null for a target that is black but belongs to another island', () => {
+    const bm = bitmapFromStrings([
+        '###########',
+        '#.........#',
+        '#.#.....#.#',
+        '#.........#',
+        '###########',
+    ]);
+    const a = labelComponents(bm, 1);
+    const [islandA, islandB] = findIslands(bm, a).sort((p, q) => p.seed[0] - q.seed[0]);
+    // islandB's own pixel is black, but it's a different island, not the body.
+    assert.equal(bridgeIslandTo(bm, a, islandA.id, islandB.seed, 1), null);
+});
+
+test('bridgeIslandTo returns null for a body pixel with no white path across (a sealed corner)', () => {
+    const bm = framed();
+    const a = labelComponents(bm, 1);
+    const [island] = findIslands(bm, a);
+    // A frame corner is black (body, part of the border), but both its 4-neighbours are also
+    // border cells - no white cell is ever adjacent to it, so no BFS can ever reach it.
+    assert.equal(bridgeIslandTo(bm, a, island.id, [0, 0], 1), null);
+});
+
 test('applyOps replays a targeted bridge, landing on the same target pixel', () => {
     const bm = framed();
     const target = [0, 3];
@@ -283,7 +306,27 @@ test('applyOps falls back to the nearest gap when a stale target is no longer bo
     const r = applyOps(bm, [{ kind: 'bridge', seed: [3, 3], widthPx: 1, target: staleTarget }]);
     assert.equal(r.ops.length, 1, 'the op is kept, not dropped, despite the stale target');
     assert.equal(r.ops[0].kind, 'bridge');
+    assert.equal(r.ops[0].fellBack, true, 'flagged so the caller can warn the user');
+    assert.equal(r.ops[0].target, undefined, 'the stale target is dropped, not kept around to fail again');
+    assert.equal(r.fellBack, 1);
     assert.notDeepEqual(r.ops[0].path[r.ops[0].path.length - 1], staleTarget, 'landed somewhere else via the nearest-gap fallback');
+    assert.equal(findIslands(r.bitmap).length, 0);
+});
+
+test('applyOps falls back to the nearest gap when the target is body but unreachable across white, and reports it', () => {
+    const bm = framed();
+    // A frame corner: black (body) but with no adjacent white cell at all, so bridgeIslandTo
+    // can never reach it directly - distinct from the "not body at all" case above.
+    const target = [0, 0];
+    const a = labelComponents(bm, 1);
+    const [island] = findIslands(bm, a);
+    assert.equal(bridgeIslandTo(bm, a, island.id, target, 1), null, 'unreachable directly, for contrast with the fallback below');
+
+    const r = applyOps(bm, [{ kind: 'bridge', seed: island.seed, widthPx: 1, target }]);
+    assert.equal(r.ops.length, 1, 'kept via the fallback, not dropped');
+    assert.equal(r.ops[0].fellBack, true);
+    assert.equal(r.ops[0].target, undefined);
+    assert.equal(r.fellBack, 1);
     assert.equal(findIslands(r.bitmap).length, 0);
 });
 

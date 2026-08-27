@@ -139,6 +139,7 @@ export function applyOps(bitmap, ops, minBodyAreaPx = 0) {
     let current = bitmap;
     const kept = [];
     const dropped = [];
+    let fellBack = 0;
     // Label once, then patch the analysis incrementally as ops are applied instead of
     // relabelling the whole bitmap per op (that was O(ops * pixels), dominant cost on a
     // large image with many ops). A delete leaves its island's old labels stale rather than
@@ -169,11 +170,22 @@ export function applyOps(bitmap, ops, minBodyAreaPx = 0) {
             current = deleteIsland(current, a, id);
             kept.push({ kind: 'delete', seed: op.seed });
         } else if (op.kind === 'bridge') {
-            // A targeted bridge tries to land exactly where the user clicked; if the threshold
-            // has since changed and that pixel is no longer part of the body, fall back to the
-            // nearest-gap search rather than dropping the op outright.
-            const r = (op.target && bridgeIslandTo(current, a, id, op.target, op.widthPx))
-                || bridgeIsland(current, a, id, op.widthPx);
+            // A targeted bridge tries to land exactly where the user clicked. If the target is
+            // no longer reachable (the threshold changed, or it was never reachable across white
+            // to begin with), fall back to the nearest-gap search rather than dropping the op
+            // outright - but the op no longer means "go to that exact point", so its `target` is
+            // dropped and it's flagged `fellBack` for the caller to warn about.
+            let r = null;
+            let usedFallback = false;
+            if (op.target) {
+                r = bridgeIslandTo(current, a, id, op.target, op.widthPx);
+                if (!r) {
+                    r = bridgeIsland(current, a, id, op.widthPx);
+                    usedFallback = Boolean(r);
+                }
+            } else {
+                r = bridgeIsland(current, a, id, op.widthPx);
+            }
             if (!r) { dropped.push({ op, reason: 'unreachable' }); continue; }
             current = r.bitmap;
             // The island is now part of the body: its bridge pixels join its label, and the
@@ -182,11 +194,12 @@ export function applyOps(bitmap, ops, minBodyAreaPx = 0) {
             a.body[id] = true;
             mergeDiagonalNeighbours(current, a, r.stamped);
             const keptOp = { kind: 'bridge', seed: op.seed, widthPx: op.widthPx, path: r.path };
-            if (op.target) keptOp.target = op.target;
+            if (op.target && !usedFallback) keptOp.target = op.target;
+            if (usedFallback) { keptOp.fellBack = true; fellBack++; }
             kept.push(keptOp);
         } else {
             throw new Error(`unknown op kind ${op.kind}`);
         }
     }
-    return { bitmap: current, ops: kept, dropped };
+    return { bitmap: current, ops: kept, dropped, fellBack };
 }

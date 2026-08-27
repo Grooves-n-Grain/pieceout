@@ -4,7 +4,7 @@
  * trace pipeline, raster or vector view on the shared canvas, export.
  */
 import { imageToBitmap } from './raster.js';
-import { applyOps } from './bridge.js';
+import { applyOps, bridgeIslandTo } from './bridge.js';
 import { labelComponents } from './components.js';
 import { tracePipeline, shapesToSVG } from './svg.js';
 import { renderOverlay } from './overlay.js';
@@ -183,6 +183,12 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             if (unreachable) {
                 state.regenerateMessages.push({ level: 'warn', field: 'islands', message: `${unreachable} island${unreachable === 1 ? '' : 's'} could not be bridged: no path to the body.` });
             }
+            // A targeted bridge whose click point stopped being reachable (a threshold change,
+            // typically) still gets bridged via the nearest-gap fallback rather than dropped -
+            // but the user asked for a specific spot and didn't get it, so say so.
+            if (replay.fellBack) {
+                state.regenerateMessages.push({ level: 'warn', field: 'islands', message: `${replay.fellBack} placed bridge${replay.fellBack === 1 ? '' : 's'} could not reach their target after the change and used the nearest gap instead.` });
+            }
             state.edited = replay.bitmap;
             // The clamp depends on the image size and current scale, both of which can have
             // just changed (new image, new width, new panel); recompute it here so a stale
@@ -252,16 +258,26 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         if (!island) return;
         const bm = state.edited;
         const inBounds = x >= 0 && y >= 0 && x < bm.width && y < bm.height;
-        let isBody = false;
-        if (inBounds && bm.data[y * bm.width + x] === 1) {
-            const a = labelComponents(bm, 1, state.params.minSpeck);
-            isBody = a.body[a.labels[y * bm.width + x]];
-        }
-        if (!isBody) {
+        if (!inBounds || bm.data[y * bm.width + x] !== 1) {
             pushClickWarning('Shift+click on the material to place the bridge.');
             return;
         }
-        pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx(), target: [x, y] });
+        const a = labelComponents(bm, 1, state.params.minSpeck);
+        if (!a.body[a.labels[y * bm.width + x]]) {
+            pushClickWarning('Shift+click on the material to place the bridge.');
+            return;
+        }
+        // The click landed on body, but that alone doesn't mean this island can actually reach
+        // it - a wall of other islands can seal it off entirely. Try the real bridge here, on
+        // the same analysis, before committing to the op: a click with no open path across white
+        // should place nothing, not silently redirect to wherever the nearest gap happens to be.
+        const islandId = a.labels[island.seed[1] * bm.width + island.seed[0]];
+        const widthPx = bridgePx();
+        if (!bridgeIslandTo(bm, a, islandId, [x, y], widthPx)) {
+            pushClickWarning(`No open path from island ${island.number} to that point. Shift+click a spot the island can reach across white.`);
+            return;
+        }
+        pushOp({ kind: 'bridge', seed: island.seed, widthPx, target: [x, y] });
     }
 
     // Plain clicks select the island under the pointer; Shift+click places a targeted bridge
