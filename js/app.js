@@ -16,6 +16,7 @@ import {
     initViewport, setInitialView, zoomIn, zoomOut, zoomFit,
 } from './viewport.js';
 import { initLayout } from './layout/layoutUI.js';
+import { initTrace } from './trace/traceUI.js';
 
 // --- State ---
 let parsedSVG = null;
@@ -57,7 +58,7 @@ const container = document.getElementById('viewport-container');
 
 container.addEventListener('dragover', (e) => {
     e.preventDefault();
-    if (activeTab === 'layout') return;
+    if (activeTab !== 'preview') return;
     e.stopPropagation();
     dropZone.classList.add('drag-over');
     if (!dropZone.classList.contains('visible')) {
@@ -67,7 +68,7 @@ container.addEventListener('dragover', (e) => {
 
 container.addEventListener('dragleave', (e) => {
     e.preventDefault();
-    if (activeTab === 'layout') return;
+    if (activeTab !== 'preview') return;
     dropZone.classList.remove('drag-over');
     if (parsedSVG) {
         dropZone.classList.remove('visible');
@@ -76,11 +77,16 @@ container.addEventListener('dragleave', (e) => {
 
 container.addEventListener('drop', (e) => {
     e.preventDefault();
-    if (activeTab === 'layout') return;
     e.stopPropagation();
     dropZone.classList.remove('drag-over');
 
     const file = e.dataTransfer?.files[0];
+    if (activeTab === 'trace') {
+        if (file) trace.loadFile(file);
+        return;
+    }
+    if (activeTab === 'layout') return;
+
     if (file && file.name.endsWith('.svg')) {
         loadFile(file);
     }
@@ -159,6 +165,7 @@ function setTab(tab) {
     activeTab = tab;
     document.body.classList.toggle('mode-preview', tab === 'preview');
     document.body.classList.toggle('mode-layout', tab === 'layout');
+    document.body.classList.toggle('mode-trace', tab === 'trace');
     tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
 
     if (tab === 'preview') {
@@ -171,8 +178,10 @@ function setTab(tab) {
             canvas.innerHTML = '';
             dropZone.classList.add('visible');
         }
-    } else {
+    } else if (tab === 'layout') {
         layout.show();
+    } else {
+        trace.show();
     }
 }
 
@@ -283,6 +292,10 @@ document.addEventListener('keydown', (e) => {
         case '0':
             zoomFit();
             break;
+        case 'v':
+            if (activeTab !== 'trace') break;
+            trace.toggleView();
+            break;
     }
 });
 
@@ -292,6 +305,15 @@ initViewport(canvas);
 
 const layout = initLayout({
     canvas,
+    onSendToPreview: (svgText) => {
+        loadSVGContent(svgText);
+        setTab('preview');
+    },
+});
+
+const trace = initTrace({
+    canvas,
+    getPanels: () => layout.getPanels(),
     onSendToPreview: (svgText) => {
         loadSVGContent(svgText);
         setTab('preview');
