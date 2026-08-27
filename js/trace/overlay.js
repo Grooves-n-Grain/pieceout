@@ -65,12 +65,12 @@ export function renderOverlay(canvas, { bitmap, islands, thin, bridges, shapes, 
     canvas.appendChild(bridgeGroup);
 
     const islandGroup = el('g', { id: 'trace-islands-overlay' });
-    islands.forEach((island, i) => {
-        const rect = bboxRect(island.bbox, 'trace-island-mark', { 'data-island-index': i });
-        if (i === selectedIsland) rect.setAttribute('stroke-width', '3');
+    islands.forEach((island) => {
+        const rect = bboxRect(island.bbox, 'trace-island-mark', { 'data-island-number': island.number });
+        if (island.number === selectedIsland) rect.setAttribute('stroke-width', '3');
         islandGroup.appendChild(rect);
         const fontSize = Math.max(8, Math.round(W / 80));
-        islandGroup.appendChild(el('text', { x: island.bbox.x1 + 2, y: island.bbox.y0 + fontSize, class: 'trace-island-label', 'font-size': fontSize }, String(i + 1)));
+        islandGroup.appendChild(el('text', { x: island.bbox.x1 + 2, y: island.bbox.y0 + fontSize, class: 'trace-island-label', 'font-size': fontSize }, String(island.number)));
     });
     canvas.appendChild(islandGroup);
 

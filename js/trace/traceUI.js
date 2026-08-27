@@ -7,6 +7,7 @@ import { imageToBitmap } from './raster.js';
 import { applyOps } from './bridge.js';
 import { tracePipeline, shapesToSVG } from './svg.js';
 import { renderOverlay } from './overlay.js';
+import { createNumbering } from './islandNumbers.js';
 import { renderIslandList, renderStats } from './traceSidebar.js';
 import { renderParamInputs, renderMessages } from '../layout/layoutForm.js';
 import { downloadText } from '../layout/download.js';
@@ -61,6 +62,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
         base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
         timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false, bridgeClampPx: null,
+        numbering: createNumbering(),
     };
     let timer = null;
 
@@ -107,17 +109,21 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         const r = state.result;
         renderIslandList(islandsEl, islandCountEl, r ? r.islands : [], state.scale, {
             selected: state.selectedIsland,
-            onSelect: (i) => { state.selectedIsland = i; renderCanvas(); renderSidebar(); },
+            onSelect: (island) => { state.selectedIsland = island.number; renderCanvas(); renderSidebar(); },
             onBridge: (island) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() }),
             onDelete: (island) => pushOp({ kind: 'delete', seed: island.seed }),
         });
         const msgs = [...state.messages, ...state.regenerateMessages];
         if (r && r.islands.length) msgs.push({ level: 'warn', field: 'islands', message: `${r.islands.length} island(s) will fall out unless bridged.` });
-        // Islands are sorted largest first, so islands[0] is the biggest. If it outweighs the
-        // whole body, the threshold or invert setting is almost certainly backwards (black and
-        // white got swapped) rather than there being a genuinely huge island to bridge.
-        if (r && r.islands.length && r.islands[0].area > r.bodyArea) {
-            msgs.push({ level: 'warn', field: 'islands', message: 'The largest island is bigger than the body; check the threshold or invert.' });
+        // Islands are now sorted by number, not size, so find the largest by area explicitly.
+        // If it outweighs the whole body, the threshold or invert setting is almost certainly
+        // backwards (black and white got swapped) rather than there being a genuinely huge
+        // island to bridge.
+        if (r && r.islands.length) {
+            const largest = r.islands.reduce((a, b) => (b.area > a.area ? b : a));
+            if (largest.area > r.bodyArea) {
+                msgs.push({ level: 'warn', field: 'islands', message: `Island ${largest.number} is bigger than the body; check the threshold or invert.` });
+            }
         }
         if (state.panelMissing) msgs.push({ level: 'warn', field: 'panel', message: 'The selected Layout panel no longer exists; using width instead.' });
         if (state.params.bridgeMm < state.params.kerfMm) msgs.push({ level: 'warn', field: 'bridgeMm', message: 'Bridge is narrower than the kerf; it may burn away.' });
@@ -175,8 +181,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             // clamp warning from a previous image doesn't linger, and a newly-needed one shows.
             bridgePx();
             state.result = tracePipeline(state.edited, { tolerancePx, kerfPx, minSpeckPx: state.params.minSpeck });
+            state.result.islands = state.numbering.assign(state.result.islands);
             state.timingMs = performance.now() - t0;
-            if (state.selectedIsland >= state.result.islands.length) state.selectedIsland = -1;
+            if (!state.result.islands.some(i => i.number === state.selectedIsland)) state.selectedIsland = -1;
         } catch (err) {
             // Keep whatever state.result/edited already held (from the last successful run)
             // visible rather than clearing them, so a bad parameter doesn't blank the canvas.
@@ -292,6 +299,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         state.name = file.name;
         state.ops = [];
         state.selectedIsland = -1;
+        state.numbering = createNumbering();
         state.view = 'raster';
         regenerate();
         setInitialView({ x: 0, y: 0, width, height });

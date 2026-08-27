@@ -11,12 +11,12 @@ export function renderIslandList(container, countEl, islands, scaleMmPerPx, { se
         container.appendChild(p);
         return;
     }
-    islands.forEach((island, i) => {
+    islands.forEach((island) => {
         const row = document.createElement('div');
-        row.className = 'island-row' + (i === selected ? ' selected' : '');
+        row.className = 'island-row' + (island.number === selected ? ' selected' : '');
         const mm2 = island.area * scaleMmPerPx * scaleMmPerPx;
         row.innerHTML = `
-            <span class="island-index">${i + 1}</span>
+            <span class="island-index">${island.number}</span>
             <span class="island-area">${mm2 < 10 ? mm2.toFixed(1) : Math.round(mm2)} mm2</span>
             <button class="small-btn" data-action="bridge" title="Bridge to the body">Bridge</button>
             <button class="small-btn" data-action="delete" title="Remove this island">Delete</button>
@@ -25,7 +25,7 @@ export function renderIslandList(container, countEl, islands, scaleMmPerPx, { se
             const action = e.target.dataset?.action;
             if (action === 'bridge') onBridge(island);
             else if (action === 'delete') onDelete(island);
-            else onSelect(i);
+            else onSelect(island);
         });
         container.appendChild(row);
     });

@@ -57,7 +57,7 @@ export function shapesToSVG({ shapes, widthPx, heightPx, scale, includeOutline, 
         const cx = fmt((island.bbox.x0 + island.bbox.x1 + 1) / 2 * scale);
         const cy = fmt((island.bbox.y0 + island.bbox.y1 + 1) / 2 * scale);
         guide.push(`<circle cx="${cx}" cy="${cy}" r="1.5"/>`);
-        guide.push(`<text x="${fmt(parseFloat(cx) + 2)}" y="${cy}" font-size="3" font-family="sans-serif" fill="${COLORS.GUIDE}" stroke="none">${i + 1}</text>`);
+        guide.push(`<text x="${fmt(parseFloat(cx) + 2)}" y="${cy}" font-size="3" font-family="sans-serif" fill="${COLORS.GUIDE}" stroke="none">${island.number ?? (i + 1)}</text>`);
     });
     for (const t of thin) {
         guide.push(`<rect x="${fmt(t.bbox.x0 * scale)}" y="${fmt(t.bbox.y0 * scale)}" width="${fmt((t.bbox.x1 - t.bbox.x0 + 1) * scale)}" height="${fmt((t.bbox.y1 - t.bbox.y0 + 1) * scale)}" stroke="${COLORS.THIN}"/>`);
