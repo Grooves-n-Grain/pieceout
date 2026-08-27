@@ -31,6 +31,18 @@ At assembly, every rail is cut identically, but each frame needs two of its four
 
 All geometry is true part geometry. Tool offsets, tabs, and feeds stay in your CAM software where they belong.
 
+## Trace tab: image to cut file, with island warnings
+
+The **Trace** tab turns a black and white image into a smooth vector cut file without leaving the browser. Black is the material that stays, white is what the laser removes.
+
+1. Open or drop a PNG, JPG, or WebP. Adjust threshold, invert, smoothness (how far the curves may stray from the pixels), and the speck size to ignore.
+2. Every **island** (a black piece not connected to the border) is boxed in red and numbered. Islands fall out after cutting. Click **Bridge** to connect one to the body across the shortest gap at the width you set, **Delete** to drop it, or **Bridge all**. Bridges survive threshold changes; **Undo** steps back.
+3. Anything narrower than your kerf is boxed in orange.
+4. Set the width in mm, or pick a panel from the Layout tab and the art is fitted to that panel's safe area.
+5. **Vector** shows the finished cut; **Export SVG** downloads it with `CUT` and `GUIDE` layers; **Send to Preview** opens it in the Preview tab.
+
+The tracer is written from scratch (contour following plus cubic Bezier fitting) so the repo stays MIT and dependency free.
+
 ## Why
 
 It was tedious to have to double-click every piece I wanted cut-out in the preview. With really intricate cuts this used to take a lot of time, and if you messed it up, you only had one `undo.` PieceOut gives you the ability to instantly see everything cut out, allowing you to identify any issues.
@@ -52,6 +64,7 @@ No package manager, no build step, zero dependencies — just plain ES6 modules 
 |-----|--------|
 | `W` | Wireframe view |
 | `F` | Preview (filled) view |
+| `V` | Toggle raster/vector on the Trace tab |
 | `+` / `-` | Zoom |
 | `0` | Fit to viewport |
 
@@ -67,6 +80,7 @@ Six vanilla JS modules, loaded directly as ES6 modules from `index.html`:
 - **[`js/viewport.js`](js/viewport.js)** — zoom/pan via viewBox manipulation. Mouse + touch.
 - **[`js/app.js`](js/app.js)** — orchestrator. State, file upload, view modes, PNG export.
 - **[`js/layout/`](js/layout/)**: the Layout tab. `templates/andonLamp.js` derives parts and joinery from lamp dimensions, `joints/` holds the half-lap and dowel-hole generators, `nest.js` packs parts onto sheets, `svgWriter.js` serialises a sheet to a true-size layered SVG, and `layoutUI.js` / `layoutForm.js` drive the sidebar. Everything below the UI is pure and unit-tested.
+- **[`js/trace/`](js/trace/)**: the Trace tab. Pure raster pipeline (bitmap, components, contours, simplify, Bezier fit, thin features, bridging, SVG) plus the controller and overlay renderer.
 
 ## Tests
 
@@ -74,7 +88,7 @@ Six vanilla JS modules, loaded directly as ES6 modules from `index.html`:
 node --test
 ```
 
-Uses Node's built-in test runner. The golden SVGs in `tests/fixtures/` are the default lamp's output; regenerate them with `node tests/fixtures/regen.js` after an intentional change to the template, nester, or writer.
+Uses Node's built-in test runner. The golden SVGs in `tests/fixtures/` are the default lamp's output; regenerate them with `node tests/fixtures/regen.js` after an intentional change to the template, nester, or writer. The Trace tab tests live in `tests/trace/`; regenerate fixtures with `node tests/trace/fixtures/regen.js`.
 
 ## Contributing
 
