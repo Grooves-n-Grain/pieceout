@@ -42,6 +42,9 @@ const btnZoomFit = document.getElementById('btn-zoom-fit');
 const btnExportPNG = document.getElementById('btn-export-png');
 const bgSelect = document.getElementById('bg-select');
 const materialColorInput = document.getElementById('material-color');
+const btnLegend = document.getElementById('btn-legend');
+const btnLegendClose = document.getElementById('btn-legend-close');
+const legendEl = document.getElementById('legend');
 
 const btnAllCut = document.getElementById('btn-all-cut');
 const btnAllIgnore = document.getElementById('btn-all-ignore');
@@ -233,6 +236,16 @@ function applyBackground() {
 
 bgSelect.addEventListener('change', applyBackground);
 
+// --- Legend ---
+
+btnLegend.addEventListener('click', () => {
+    legendEl.hidden = !legendEl.hidden;
+});
+
+btnLegendClose.addEventListener('click', () => {
+    legendEl.hidden = true;
+});
+
 // --- Material color ---
 
 materialColorInput.addEventListener('input', (e) => {
@@ -289,6 +302,9 @@ document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 
     switch (e.key.toLowerCase()) {
+        case 'escape':
+            if (!legendEl.hidden) legendEl.hidden = true;
+            break;
         case 'w':
             if (activeTab !== 'preview') break;
             currentView = 'wireframe';

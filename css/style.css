@@ -653,3 +653,105 @@ body.mode-trace #drop-zone {
 .trace-thin-mark { fill: rgba(245, 166, 35, 0.35); stroke: #f5a623; stroke-width: 1; }
 .trace-bridge { fill: none; stroke: #4ade80; stroke-width: 2; stroke-linecap: round; }
 .trace-contour { fill: none; stroke: #22d3ee; stroke-width: 0.8; }
+
+/* Legend panel */
+#legend {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    max-width: 360px;
+    max-height: calc(100% - 24px);
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    z-index: 20;
+    font-size: 12px;
+    color: var(--text-primary);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+#legend-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+#legend-header h3 {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.legend-section {
+    margin-bottom: 12px;
+}
+
+.legend-section:last-child {
+    margin-bottom: 0;
+}
+
+.legend-section h4 {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.legend-section ul {
+    list-style: none;
+}
+
+.legend-section li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+    line-height: 1.4;
+}
+
+.legend-section p {
+    margin-bottom: 6px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+.legend-section p:last-child {
+    margin-bottom: 0;
+}
+
+.legend-section p strong {
+    color: var(--text-primary);
+}
+
+.legend-swatch {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.legend-swatch.box {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.legend-swatch.line {
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    margin-top: 6px;
+}
+
+.legend-swatch.island { background: rgba(233, 69, 96, 0.35); border: 1px solid #e94560; }
+.legend-swatch.thin { background: rgba(245, 166, 35, 0.35); border: 1px solid #f5a623; }
+.legend-swatch.bridge { background: #4ade80; }
+.legend-swatch.contour { background: #22d3ee; }
+
+.legend-number {
+    flex-shrink: 0;
+    font-weight: 600;
+    color: #e94560;
+}

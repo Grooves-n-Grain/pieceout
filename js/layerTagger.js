@@ -14,7 +14,9 @@ export const LayerType = {
 // layers like "Engrave Labels" or "Reference Cut Line" from pocket/cut to ignore.
 const IGNORE_PREFIXES = ['guide'];
 
-// Keywords that suggest a layer is a cut-through
+// Keywords that suggest a layer is a cut-through.
+// The in-app legend (index.html #legend, "Layer keywords (Preview)" section) shows a static
+// copy of these lists for the user - keep the two in sync when editing either one.
 const CUT_KEYWORDS = [
     'profile', 'cut', 'through', 'outline', 'cutout', 'cut-out',
     'contour', 'outside', 'border', 'perimeter', 'laser', 'drill',
