@@ -220,7 +220,7 @@ btnZoomFit.addEventListener('click', zoomFit);
 
 // --- Background toggle ---
 
-bgSelect.addEventListener('change', () => {
+function applyBackground() {
     viewport.className = '';
     switch (bgSelect.value) {
         case 'light': viewport.classList.add('bg-light'); break;
@@ -229,7 +229,9 @@ bgSelect.addEventListener('change', () => {
     if (currentView === 'preview') {
         applyView();
     }
-});
+}
+
+bgSelect.addEventListener('change', applyBackground);
 
 // --- Material color ---
 
@@ -337,4 +339,7 @@ const trace = initTrace({
     getBackground: getBackgroundColor,
 });
 
+// The browser restores #bg-select's value on reload but never fires its change event, so
+// apply it explicitly before the first tab render.
+applyBackground();
 setTab('preview');
