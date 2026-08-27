@@ -616,6 +616,12 @@ body.mode-trace #drop-zone {
     color: var(--text-secondary);
 }
 
+#trace-bridge-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 4px 0;
+}
+
 .island-row {
     display: grid;
     grid-template-columns: 24px 1fr auto auto;
@@ -648,8 +654,8 @@ body.mode-trace #drop-zone {
 }
 
 /* Overlay colours on the shared canvas */
-.trace-island-mark { fill: rgba(233, 69, 96, 0.35); stroke: #e94560; stroke-width: 1; }
-.trace-island-label { fill: #e94560; font-family: sans-serif; }
+.trace-island-mark { fill: rgba(233, 69, 96, 0.35); stroke: #e94560; stroke-width: 1; cursor: pointer; }
+.trace-island-label { fill: #e94560; font-family: sans-serif; cursor: pointer; }
 .trace-thin-mark { fill: rgba(245, 166, 35, 0.35); stroke: #f5a623; stroke-width: 1; }
 .trace-bridge { fill: none; stroke: #4ade80; stroke-width: 2; stroke-linecap: round; }
 .trace-contour { fill: none; stroke: #22d3ee; stroke-width: 0.8; }

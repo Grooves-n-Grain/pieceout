@@ -303,7 +303,8 @@ document.addEventListener('keydown', (e) => {
 
     switch (e.key.toLowerCase()) {
         case 'escape':
-            if (!legendEl.hidden) legendEl.hidden = true;
+            if (!legendEl.hidden) { legendEl.hidden = true; break; }
+            if (activeTab === 'trace') trace.clearSelection();
             break;
         case 'w':
             if (activeTab !== 'preview') break;

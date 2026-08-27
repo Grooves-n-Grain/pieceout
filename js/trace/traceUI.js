@@ -5,6 +5,7 @@
  */
 import { imageToBitmap } from './raster.js';
 import { applyOps } from './bridge.js';
+import { labelComponents } from './components.js';
 import { tracePipeline, shapesToSVG } from './svg.js';
 import { renderOverlay } from './overlay.js';
 import { createNumbering } from './islandNumbers.js';
@@ -106,11 +107,17 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         btnVector.textContent = state.view === 'raster' ? 'Vector' : 'Raster';
     }
 
+    function selectIsland(number) {
+        state.selectedIsland = number;
+        renderCanvas();
+        renderSidebar();
+    }
+
     function renderSidebar() {
         const r = state.result;
         renderIslandList(islandsEl, islandCountEl, r ? r.islands : [], state.scale, {
             selected: state.selectedIsland,
-            onSelect: (island) => { state.selectedIsland = island.number; renderCanvas(); renderSidebar(); },
+            onSelect: (island) => selectIsland(island.number),
             onBridge: (island) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() }),
             onDelete: (island) => pushOp({ kind: 'delete', seed: island.seed }),
         });
@@ -219,6 +226,68 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         state.selectedIsland = -1;
         regenerate();
     }
+
+    // Shows a warning next to the islands list without waiting on a regenerate; replaces any
+    // earlier copy of the same message instead of piling up duplicates from repeated bad clicks.
+    function pushClickWarning(message) {
+        state.regenerateMessages = state.regenerateMessages.filter((m) => m.message !== message);
+        state.regenerateMessages.push({ level: 'warn', field: 'islands', message });
+        renderSidebar();
+    }
+
+    // Converts a client (viewport pixel) coordinate to a bitmap pixel coordinate via the
+    // canvas's own screen CTM, so this works whatever the current pan/zoom is.
+    function clientToPixel(clientX, clientY) {
+        const ctm = canvas.getScreenCTM();
+        if (!ctm) return null;
+        const pt = canvas.createSVGPoint();
+        pt.x = clientX;
+        pt.y = clientY;
+        const p = pt.matrixTransform(ctm.inverse());
+        return [Math.floor(p.x), Math.floor(p.y)];
+    }
+
+    function placeBridgeAt([x, y]) {
+        const island = state.result.islands.find((i) => i.number === state.selectedIsland);
+        if (!island) return;
+        const bm = state.edited;
+        const inBounds = x >= 0 && y >= 0 && x < bm.width && y < bm.height;
+        let isBody = false;
+        if (inBounds && bm.data[y * bm.width + x] === 1) {
+            const a = labelComponents(bm, 1, state.params.minSpeck);
+            isBody = a.body[a.labels[y * bm.width + x]];
+        }
+        if (!isBody) {
+            pushClickWarning('Shift+click on the material to place the bridge.');
+            return;
+        }
+        pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx(), target: [x, y] });
+    }
+
+    // Plain clicks select the island under the pointer; Shift+click places a targeted bridge
+    // from the currently selected island to the clicked point. Guarded so this never fires
+    // outside the Trace tab or its raster view (the canvas is shared with Preview/Layout, and
+    // vector view's viewBox is in mm, not bitmap pixels) and never treats the mouseup at the
+    // end of a pan drag as a click (viewport.js owns panning; it does not stop this 'click' from
+    // firing, so a moved-since-mousedown check is needed here to tell the two apart).
+    let mouseDownPos = null;
+    canvas.addEventListener('mousedown', (e) => { mouseDownPos = { x: e.clientX, y: e.clientY }; });
+    canvas.addEventListener('click', (e) => {
+        if (!document.body.classList.contains('mode-trace')) return;
+        if (state.view !== 'raster' || !state.result) return;
+        const start = mouseDownPos;
+        mouseDownPos = null;
+        if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3) return;
+
+        if (e.shiftKey) {
+            if (state.selectedIsland < 0) return;
+            const px = clientToPixel(e.clientX, e.clientY);
+            if (px) placeBridgeAt(px);
+            return;
+        }
+        const hit = e.target.closest && e.target.closest('[data-island-number]');
+        if (hit) selectIsland(Number(hit.dataset.islandNumber));
+    });
 
     function onParamChange(key, value) {
         state.params[key] = value;
@@ -369,5 +438,11 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         },
         loadFile,
         toggleView,
+        clearSelection() {
+            if (state.selectedIsland < 0) return;
+            state.selectedIsland = -1;
+            renderCanvas();
+            renderSidebar();
+        },
     };
 }

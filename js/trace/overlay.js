@@ -73,7 +73,10 @@ export function renderOverlay(canvas, { bitmap, islands, thin, bridges, shapes, 
         if (island.number === selectedIsland) rect.setAttribute('stroke-width', '3');
         islandGroup.appendChild(rect);
         const fontSize = Math.max(8, Math.round(W / 80));
-        islandGroup.appendChild(el('text', { x: island.bbox.x1 + 2, y: island.bbox.y0 + fontSize, class: 'trace-island-label', 'font-size': fontSize }, String(island.number)));
+        islandGroup.appendChild(el('text', {
+            x: island.bbox.x1 + 2, y: island.bbox.y0 + fontSize, class: 'trace-island-label',
+            'font-size': fontSize, 'data-island-number': island.number,
+        }, String(island.number)));
     });
     canvas.appendChild(islandGroup);
 

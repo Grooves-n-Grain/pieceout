@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import { bitmapFromStrings, bitmapToStrings, getPixel } from '../../js/trace/bitmap.js';
 import { labelComponents, findIslands } from '../../js/trace/components.js';
-import { stampDisc, bridgeIsland, deleteIsland, applyOps } from '../../js/trace/bridge.js';
+import { stampDisc, bridgeIsland, bridgeIslandTo, deleteIsland, applyOps } from '../../js/trace/bridge.js';
 
 const framed = () => bitmapFromStrings([
     '#######',
@@ -239,6 +239,52 @@ test('applyOps stays fast when bridging many islands on a large bitmap', () => {
     assert.equal(r.ops.length, 40);
     assert.equal(findIslands(r.bitmap).length, 0);
     assert.ok(elapsed < 400, `applyOps took ${elapsed.toFixed(1)}ms, expected < 400ms`);
+});
+
+test('bridgeIslandTo reaches the given point, ending the path there', () => {
+    const bm = framed();
+    const a = labelComponents(bm, 1);
+    const [island] = findIslands(bm, a);
+    const target = [0, 3]; // left wall, straight across from the island at [3, 3]
+    const r = bridgeIslandTo(bm, a, island.id, target, 1);
+    assert.ok(r);
+    assert.deepEqual(r.path[r.path.length - 1], target);
+    assert.equal(getPixel(r.bitmap, ...target), 1);
+    assert.equal(findIslands(r.bitmap).length, 0);
+    assert.equal(findIslands(bm).length, 1, 'input untouched');
+});
+
+test('bridgeIslandTo returns null for a target that is not a body pixel', () => {
+    const bm = framed();
+    const a = labelComponents(bm, 1);
+    const [island] = findIslands(bm, a);
+    // A plain white interior cell is not black at all, let alone body.
+    assert.equal(bridgeIslandTo(bm, a, island.id, [3, 2], 1), null);
+    // Out of bounds.
+    assert.equal(bridgeIslandTo(bm, a, island.id, [-1, 3], 1), null);
+});
+
+test('applyOps replays a targeted bridge, landing on the same target pixel', () => {
+    const bm = framed();
+    const target = [0, 3];
+    const r = applyOps(bm, [{ kind: 'bridge', seed: [3, 3], widthPx: 1, target }]);
+    assert.equal(r.ops.length, 1);
+    assert.equal(r.ops[0].kind, 'bridge');
+    assert.deepEqual(r.ops[0].target, target);
+    assert.deepEqual(r.ops[0].path[r.ops[0].path.length - 1], target);
+    assert.equal(findIslands(r.bitmap).length, 0);
+});
+
+test('applyOps falls back to the nearest gap when a stale target is no longer body', () => {
+    const bm = framed();
+    // [3, 2] is a white interior cell in this bitmap, never body - stands in for a target that
+    // used to be body before some threshold change invalidated it.
+    const staleTarget = [3, 2];
+    const r = applyOps(bm, [{ kind: 'bridge', seed: [3, 3], widthPx: 1, target: staleTarget }]);
+    assert.equal(r.ops.length, 1, 'the op is kept, not dropped, despite the stale target');
+    assert.equal(r.ops[0].kind, 'bridge');
+    assert.notDeepEqual(r.ops[0].path[r.ops[0].path.length - 1], staleTarget, 'landed somewhere else via the nearest-gap fallback');
+    assert.equal(findIslands(r.bitmap).length, 0);
 });
 
 test('applyOps drops a delete for an island a bridge fused into the body diagonally', () => {

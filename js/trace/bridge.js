@@ -1,7 +1,7 @@
 /**
  * Island repair: bridge an island to the body across the shortest white gap,
- * or delete it. Edits are stored as replayable ops keyed by the island's seed
- * pixel so they survive a threshold change.
+ * to a specific clicked point, or delete it. Edits are stored as replayable
+ * ops keyed by the island's seed pixel so they survive a threshold change.
  */
 import { cloneBitmap } from './bitmap.js';
 import { labelComponents } from './components.js';
@@ -25,9 +25,16 @@ export function stampDisc(bitmap, cx, cy, radius, out) {
     }
 }
 
-export function bridgeIsland(bitmap, analysis, islandId, widthPx) {
+// Shared BFS: walk outward from the island across white pixels (4-connectivity), treating any
+// other black pixel as a wall unless isGoal(j) says otherwise. bridgeIsland's goal is "any body
+// pixel"; bridgeIslandTo's goal is "this one specific target pixel". Every neighbour (white or
+// black) is marked visited and given a parent before the black/goal check runs, both so a wall
+// pixel is never re-examined by another frontier cell and so the goal pixel itself - which is
+// black and therefore never pushed onto the frontier - still has a parent to trace the path back
+// through once it's found.
+function bfsToGoal(bitmap, analysis, islandId, isGoal) {
     const { width: W, height: H, data } = bitmap;
-    const { labels, body } = analysis;
+    const { labels } = analysis;
     const N = W * H;
     const parent = new Int32Array(N).fill(-1);
     const visited = new Uint8Array(N);
@@ -48,8 +55,8 @@ export function bridgeIsland(bitmap, analysis, islandId, widthPx) {
                 visited[j] = 1;
                 parent[j] = i;
                 if (data[j] === 1) {
-                    if (body[labels[j]]) { target = j; break; }
-                    continue; // another island: wall
+                    if (isGoal(j)) { target = j; break; }
+                    continue; // wall: another island, or a body pixel that isn't the goal
                 }
                 next.push(j);
             }
@@ -62,11 +69,39 @@ export function bridgeIsland(bitmap, analysis, islandId, widthPx) {
     const path = [];
     for (let p = target; p >= 0 && labels[p] !== islandId; p = parent[p]) path.push([p % W, (p - (p % W)) / W]);
     path.reverse();
+    return path;
+}
+
+function stampPath(bitmap, path, widthPx) {
     const out = cloneBitmap(bitmap);
     const radius = Math.max(0, widthPx / 2 - 0.5);
     const stamped = [];
     for (const [x, y] of path) stampDisc(out, x, y, radius, stamped);
     return { bitmap: out, path, stamped };
+}
+
+export function bridgeIsland(bitmap, analysis, islandId, widthPx) {
+    const { labels, body } = analysis;
+    const path = bfsToGoal(bitmap, analysis, islandId, (j) => body[labels[j]]);
+    if (!path) return null;
+    return stampPath(bitmap, path, widthPx);
+}
+
+// Bridge an island to one specific black pixel of the body (a user's click), rather than
+// whichever body pixel happens to be nearest. Returns null if the target isn't currently a
+// body pixel (off the material entirely, on a different island, or the body/island split has
+// changed since the click was made) or if no white path can reach it.
+export function bridgeIslandTo(bitmap, analysis, islandId, target, widthPx) {
+    const { width: W, height: H, data } = bitmap;
+    const { labels, body } = analysis;
+    const [tx, ty] = target;
+    if (tx < 0 || ty < 0 || tx >= W || ty >= H) return null;
+    const targetIdx = ty * W + tx;
+    if (data[targetIdx] !== 1 || !body[labels[targetIdx]]) return null;
+
+    const path = bfsToGoal(bitmap, analysis, islandId, (j) => j === targetIdx);
+    if (!path) return null;
+    return stampPath(bitmap, path, widthPx);
 }
 
 export function deleteIsland(bitmap, analysis, islandId) {
@@ -107,9 +142,9 @@ export function applyOps(bitmap, ops, minBodyAreaPx = 0) {
     // Label once, then patch the analysis incrementally as ops are applied instead of
     // relabelling the whole bitmap per op (that was O(ops * pixels), dominant cost on a
     // large image with many ops). A delete leaves its island's old labels stale rather than
-    // clearing them: those pixels are now white, and every reader below (and bridgeIsland's
-    // BFS, which walls off other islands only when `data[j] === 1`) only trusts a label when
-    // the matching bitmap pixel is still black, so a stale label on a white pixel is inert.
+    // clearing them: those pixels are now white, and every reader below (and bfsToGoal, which
+    // walls off other islands only when `data[j] === 1`) only trusts a label when the matching
+    // bitmap pixel is still black, so a stale label on a white pixel is inert.
     // A bridge's new material can also land 8-adjacent to a *different* island: black uses
     // 8-connectivity, so that neighbour is now physically fused into the body even though it
     // keeps its own old label. That other label's `body` flag is patched to true below so a
@@ -134,7 +169,11 @@ export function applyOps(bitmap, ops, minBodyAreaPx = 0) {
             current = deleteIsland(current, a, id);
             kept.push({ kind: 'delete', seed: op.seed });
         } else if (op.kind === 'bridge') {
-            const r = bridgeIsland(current, a, id, op.widthPx);
+            // A targeted bridge tries to land exactly where the user clicked; if the threshold
+            // has since changed and that pixel is no longer part of the body, fall back to the
+            // nearest-gap search rather than dropping the op outright.
+            const r = (op.target && bridgeIslandTo(current, a, id, op.target, op.widthPx))
+                || bridgeIsland(current, a, id, op.widthPx);
             if (!r) { dropped.push({ op, reason: 'unreachable' }); continue; }
             current = r.bitmap;
             // The island is now part of the body: its bridge pixels join its label, and the
@@ -142,7 +181,9 @@ export function applyOps(bitmap, ops, minBodyAreaPx = 0) {
             for (const i of r.stamped) a.labels[i] = id;
             a.body[id] = true;
             mergeDiagonalNeighbours(current, a, r.stamped);
-            kept.push({ kind: 'bridge', seed: op.seed, widthPx: op.widthPx, path: r.path });
+            const keptOp = { kind: 'bridge', seed: op.seed, widthPx: op.widthPx, path: r.path };
+            if (op.target) keptOp.target = op.target;
+            kept.push(keptOp);
         } else {
             throw new Error(`unknown op kind ${op.kind}`);
         }
