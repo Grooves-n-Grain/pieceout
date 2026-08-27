@@ -29,7 +29,7 @@ export function renderIslandList(container, countEl, islands, scaleMmPerPx, { se
             if (action === 'bridge') onBridge(island);
             else if (action === 'delete') onDelete(island);
             else if (action === 'keep') onKeep(island);
-            else onSelect(island);
+            else onSelect(island, row);
         });
         container.appendChild(row);
     });

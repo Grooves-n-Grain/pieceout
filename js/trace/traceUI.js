@@ -11,6 +11,7 @@ import { renderOverlay } from './overlay.js';
 import { createNumbering, seedKey, bulkTargets } from './islandNumbers.js';
 import { removeSmallIslands } from './sizeRule.js';
 import { renderIslandList, renderStats } from './traceSidebar.js';
+import { renderIslandPopover, positionPopover } from './islandPopover.js';
 import { renderParamInputs, renderMessages } from '../layout/layoutForm.js';
 import { downloadText } from '../layout/download.js';
 import { parseSVG } from '../svgParser.js';
@@ -61,12 +62,16 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     const btnVector = $('btn-trace-vector');
     const btnExport = $('btn-trace-export');
     const btnSend = $('btn-trace-send');
+    const bridgeHintEl = $('trace-bridge-hint');
+    const popoverEl = $('trace-island-popover');
+    const viewportContainerEl = $('viewport-container');
+    const DEFAULT_HINT = bridgeHintEl.textContent;
 
     const state = {
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
         base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
         timingMs: 0, messages: [], regenerateMessages: [], panelMissing: false, bridgeClampPx: null,
-        numbering: createNumbering(), kept: new Set(),
+        numbering: createNumbering(), kept: new Set(), popover: null, placing: null,
     };
     let timer = null;
 
@@ -109,21 +114,34 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         btnVector.textContent = state.view === 'raster' ? 'Vector' : 'Raster';
     }
 
-    function selectIsland(number) {
+    // anchorEl is the DOM element the popover should be anchored next to (a sidebar row or the
+    // canvas mark that was clicked); omitted when the selection changes for some other reason,
+    // in which case any open popover no longer applies to anything and is closed.
+    function selectIsland(number, anchorEl) {
         state.selectedIsland = number;
         renderCanvas();
         renderSidebar();
+        if (!anchorEl) { closePopover(); return; }
+        const island = state.result && state.result.islands.find((i) => i.number === number);
+        if (island) openPopover(island, anchorEl);
+    }
+
+    function renderHint() {
+        bridgeHintEl.textContent = state.placing
+            ? `Click the material to place the bridge for island ${state.placing.number} (Esc to cancel).`
+            : DEFAULT_HINT;
     }
 
     function renderSidebar() {
         const r = state.result;
         renderIslandList(islandsEl, islandCountEl, r ? r.islands : [], state.scale, {
             selected: state.selectedIsland,
-            onSelect: (island) => selectIsland(island.number),
+            onSelect: (island, row) => selectIsland(island.number, row),
             onBridge: (island) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() }),
             onDelete: (island) => pushOp({ kind: 'delete', seed: island.seed }),
             onKeep: (island) => toggleKeep(island),
         });
+        renderHint();
         const msgs = [...state.messages, ...state.regenerateMessages];
         if (r && r.islands.length) {
             const targets = bulkTargets(r.islands);
@@ -162,28 +180,88 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     // Flips whether an island is kept as a separate piece rather than bridged/deleted. Kept
     // islands are annotated straight onto state.result.islands so the list and overlay pick it
     // up immediately; a full regenerate is only needed when the size rule is active, since kept
-    // changes what that rule would otherwise remove.
+    // changes what that rule would otherwise remove. Either way, an open popover for this (or
+    // any) island is refreshed afterwards rather than closed - see the note on regenerate().
     function toggleKeep(island) {
         const key = seedKey(island.seed);
         if (state.kept.has(key)) state.kept.delete(key);
         else state.kept.add(key);
-        if (state.params.minIslandMm2 > 0) { regenerate(); return; }
+        if (state.params.minIslandMm2 > 0) { regenerate({ keepPopover: true }); return; }
         if (state.result) {
             state.result.islands = state.result.islands.map((isl) => ({ ...isl, kept: state.kept.has(seedKey(isl.seed)) }));
         }
         renderCanvas();
         renderSidebar();
+        syncPopover();
     }
 
-    function bridgePx() {
-        // A bridge wider than the image itself is nonsensical and can make stampDisc do
-        // needless work; cap it to a quarter of the shorter side and tell the user why their
-        // requested width didn't take effect.
+    // bridgePxFor generalises the old fixed-width bridgePx() to any mm value, so the popover's
+    // own width field can differ from the global Bridge width setting. Both share the same cap:
+    // a bridge wider than the image itself is nonsensical and can make stampDisc do needless
+    // work, so it's clamped to a quarter of the shorter side and the user is told why their
+    // requested width didn't take effect.
+    function bridgePxFor(mm) {
         const cap = Math.max(1, Math.round(Math.min(state.edited.width, state.edited.height) / 4));
-        const px = Math.max(1, Math.round(state.params.bridgeMm / state.scale));
+        const px = Math.max(1, Math.round(mm / state.scale));
         if (px > cap) { state.bridgeClampPx = cap; return cap; }
         state.bridgeClampPx = null;
         return px;
+    }
+
+    function bridgePx() {
+        return bridgePxFor(state.params.bridgeMm);
+    }
+
+    // --- Island popover: bridge/place/delete/keep for whichever island was last selected ---
+
+    function positionPopoverNow() {
+        if (!state.popover) return;
+        const anchorRect = state.popover.anchorEl.getBoundingClientRect();
+        const viewportRect = viewportContainerEl.getBoundingClientRect();
+        positionPopover(popoverEl, anchorRect, viewportRect);
+    }
+
+    function renderPopoverContents(island) {
+        const mm2 = island.area * state.scale * state.scale;
+        renderIslandPopover(popoverEl, { ...island, mm2 }, {
+            bridgeMm: state.params.bridgeMm,
+            kept: Boolean(island.kept),
+            onBridge: (widthMm) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePxFor(widthMm) }),
+            onPlace: (widthMm) => startPlacing(island, widthMm),
+            onDelete: () => pushOp({ kind: 'delete', seed: island.seed }),
+            onKeep: () => toggleKeep(island),
+            onClose: () => closePopover(),
+        });
+    }
+
+    // Re-reads the popover's island from the latest state.result (its data - area, kept flag,
+    // even whether it still exists - can change out from under an open popover after a
+    // regenerate) and re-renders and repositions it in place, or closes it if the island is gone.
+    function syncPopover() {
+        if (!state.popover) return;
+        const island = state.result && state.result.islands.find((i) => i.number === state.popover.number);
+        if (!island) { closePopover(); return; }
+        renderPopoverContents(island);
+        positionPopoverNow();
+    }
+
+    function openPopover(island, anchorEl) {
+        state.popover = { number: island.number, anchorEl };
+        popoverEl.hidden = false;
+        syncPopover();
+    }
+
+    function closePopover() {
+        if (!state.popover) return;
+        state.popover = null;
+        popoverEl.hidden = true;
+        popoverEl.innerHTML = '';
+    }
+
+    function startPlacing(island, widthMm) {
+        state.placing = { number: island.number, widthPx: bridgePxFor(widthMm) };
+        closePopover();
+        renderSidebar();
     }
 
     function setBusyButtons(disabled) {
@@ -252,10 +330,21 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             document.body.classList.remove('trace-busy');
             setBusyButtons(false);
             renderSidebar();
+            // A no-op unless keepPopover asked to keep the popover open through this
+            // regenerate (see toggleKeep) - in every other case it was already closed
+            // synchronously below, before the pipeline even ran.
+            syncPopover();
         }
     }
 
-    function regenerate() {
+    // keepPopover exists for exactly one caller (toggleKeep with the size rule active): flipping
+    // "kept" can change what the size rule removes, which needs a real regenerate, but the user
+    // is still looking at that island's popover and didn't ask to close it. Every other call site
+    // closes the popover and cancels any pending "place bridge" click immediately, since a
+    // regenerate can change island numbers, areas, or positions out from under them.
+    function regenerate({ keepPopover = false } = {}) {
+        if (!keepPopover) closePopover();
+        state.placing = null;
         if (!state.imageData) { renderSidebar(); return; }
         document.body.classList.add('trace-busy');
         setBusyButtons(true);
@@ -299,18 +388,23 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         return [Math.floor(p.x), Math.floor(p.y)];
     }
 
-    function placeBridgeAt([x, y]) {
-        const island = state.result.islands.find((i) => i.number === state.selectedIsland);
+    // islandNumber/widthPx are passed explicitly rather than read from state so the same
+    // function serves both entry points: Shift+click (the currently selected island, the global
+    // Bridge width) and a "Place bridge" click while state.placing is active (a specific island
+    // and a width the user typed into its popover).
+    function placeBridgeAt([x, y], islandNumber, widthPx) {
+        const island = state.result.islands.find((i) => i.number === islandNumber);
         if (!island) return;
+        const verb = state.placing ? 'Click' : 'Shift+click';
         const bm = state.edited;
         const inBounds = x >= 0 && y >= 0 && x < bm.width && y < bm.height;
         if (!inBounds || bm.data[y * bm.width + x] !== 1) {
-            pushClickWarning('Shift+click on the material to place the bridge.');
+            pushClickWarning(`${verb} on the material to place the bridge.`);
             return;
         }
         const a = labelComponents(bm, 1, state.params.minSpeck);
         if (!a.body[a.labels[y * bm.width + x]]) {
-            pushClickWarning('Shift+click on the material to place the bridge.');
+            pushClickWarning(`${verb} on the material to place the bridge.`);
             return;
         }
         // The click landed on body, but that alone doesn't mean this island can actually reach
@@ -318,20 +412,22 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         // the same analysis, before committing to the op: a click with no open path across white
         // should place nothing, not silently redirect to wherever the nearest gap happens to be.
         const islandId = a.labels[island.seed[1] * bm.width + island.seed[0]];
-        const widthPx = bridgePx();
         if (!bridgeIslandTo(bm, a, islandId, [x, y], widthPx)) {
-            pushClickWarning(`No open path from island ${island.number} to that point. Shift+click a spot the island can reach across white.`);
+            pushClickWarning(`No open path from island ${island.number} to that point. ${verb} a spot the island can reach across white.`);
             return;
         }
         pushOp({ kind: 'bridge', seed: island.seed, widthPx, target: [x, y] });
     }
 
-    // Plain clicks select the island under the pointer; Shift+click places a targeted bridge
-    // from the currently selected island to the clicked point. Guarded so this never fires
-    // outside the Trace tab or its raster view (the canvas is shared with Preview/Layout, and
-    // vector view's viewBox is in mm, not bitmap pixels) and never treats the mouseup at the
-    // end of a pan drag as a click (viewport.js owns panning; it does not stop this 'click' from
-    // firing, so a moved-since-mousedown check is needed here to tell the two apart).
+    // Plain clicks select the island under the pointer, place a bridge while state.placing is
+    // active (see "Place bridge" in the island popover), or - failing both - do nothing.
+    // Shift+click places a targeted bridge from the currently selected island to the clicked
+    // point using the global Bridge width, same as before "Place bridge" existed. Guarded so
+    // this never fires outside the Trace tab or its raster view (the canvas is shared with
+    // Preview/Layout, and vector view's viewBox is in mm, not bitmap pixels) and never treats
+    // the mouseup at the end of a pan drag as a click (viewport.js owns panning; it does not
+    // stop this 'click' from firing, so a moved-since-mousedown check is needed here to tell the
+    // two apart).
     let mouseDownPos = null;
     canvas.addEventListener('mousedown', (e) => { mouseDownPos = { x: e.clientX, y: e.clientY }; });
     canvas.addEventListener('click', (e) => {
@@ -341,14 +437,33 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         mouseDownPos = null;
         if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3) return;
 
+        if (state.placing) {
+            const px = clientToPixel(e.clientX, e.clientY);
+            if (px) placeBridgeAt(px, state.placing.number, state.placing.widthPx);
+            return;
+        }
         if (e.shiftKey) {
             if (state.selectedIsland < 0) return;
             const px = clientToPixel(e.clientX, e.clientY);
-            if (px) placeBridgeAt(px);
+            if (px) placeBridgeAt(px, state.selectedIsland, bridgePx());
             return;
         }
         const hit = e.target.closest && e.target.closest('[data-island-number]');
-        if (hit) selectIsland(Number(hit.dataset.islandNumber));
+        if (hit) selectIsland(Number(hit.dataset.islandNumber), hit);
+    });
+
+    // Closes the popover on a click anywhere else - a mousedown listener rather than 'click' so
+    // it runs before the click handler above opens a new popover for a different island. Ignored
+    // whenever the popover is already hidden, so this costs nothing outside the Trace tab.
+    document.addEventListener('mousedown', (e) => {
+        if (popoverEl.hidden || popoverEl.contains(e.target)) return;
+        closePopover();
+    });
+
+    // The popover is positioned from the anchor's live screen rect; a wheel zoom/pan changes
+    // that rect without going through regenerate(), so it needs its own close here.
+    canvas.parentElement.addEventListener('wheel', () => {
+        if (document.body.classList.contains('mode-trace')) closePopover();
     });
 
     function onParamChange(key, value) {
@@ -480,6 +595,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     function toggleView() {
         if (!state.result) return;
         state.view = state.view === 'raster' ? 'vector' : 'raster';
+        closePopover();
         renderCanvas();
     }
 
@@ -488,6 +604,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
 
     return {
         show() {
+            // The popover is anchored to a specific DOM element from whichever tab we're
+            // leaving; it can't usefully follow us to this one.
+            closePopover();
             const changed = refreshPanelSelect();
             // app.js now owns remembering and restoring each tab's own pan/zoom across a tab
             // switch (see setTab in app.js), so this never calls setInitialView itself - that
@@ -504,8 +623,11 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         loadFile,
         toggleView,
         clearSelection() {
-            if (state.selectedIsland < 0) return;
-            state.selectedIsland = -1;
+            let changed = false;
+            if (state.selectedIsland >= 0) { state.selectedIsland = -1; changed = true; }
+            if (state.placing) { state.placing = null; changed = true; }
+            if (state.popover) { closePopover(); changed = true; }
+            if (!changed) return;
             renderCanvas();
             renderSidebar();
         },

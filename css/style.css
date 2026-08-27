@@ -674,6 +674,56 @@ body.mode-trace #drop-zone {
 .trace-bridge { fill: none; stroke: #4ade80; stroke-width: 2; stroke-linecap: round; }
 .trace-contour { fill: none; stroke: #22d3ee; stroke-width: 0.8; }
 
+/* Island popover: bridge/place/delete/keep actions for the currently selected island,
+   positioned next to whatever was clicked (a sidebar row or the canvas mark itself). */
+#trace-island-popover {
+    position: fixed;
+    z-index: 20;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    min-width: 180px;
+}
+
+.popover-header {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.popover-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.popover-row label {
+    color: var(--text-secondary);
+}
+
+.popover-row input[type="number"] {
+    width: 56px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 12px;
+}
+
+.popover-row .unit {
+    color: var(--text-secondary);
+}
+
+.popover-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
 /* Legend panel */
 #legend {
     position: absolute;
