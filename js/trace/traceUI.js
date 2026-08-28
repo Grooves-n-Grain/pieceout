@@ -236,6 +236,50 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         syncPopover();
     }
 
+    // Bridge selected: one bridge op per selected island at the group popover's width, pushed as
+    // a single batch so the pipeline only regenerates once - mirrors Bridge all/Delete all above,
+    // not pushOp's one-op-at-a-time API. Un-keeps the affected islands and clears the selection,
+    // same as pushOp does for a lone bridge.
+    function bridgeSelected(islands, widthMm) {
+        const { px, clamped } = clampBridgePx(widthMm);
+        if (clamped) state.opWarnings.push({ level: 'warn', field: 'islands', message: `Bridge width clamped to ${px} px for this image.` });
+        for (const island of islands) {
+            state.ops.push({ kind: 'bridge', seed: island.seed, widthPx: px });
+            state.kept.delete(seedKey(island.seed));
+        }
+        state.selected = new Set();
+        regenerate();
+    }
+
+    // Delete selected: same one-batch shape as bridgeSelected above.
+    function deleteSelected(islands) {
+        for (const island of islands) {
+            state.ops.push({ kind: 'delete', seed: island.seed });
+            state.kept.delete(seedKey(island.seed));
+        }
+        state.selected = new Set();
+        regenerate();
+    }
+
+    // Keep selected: sets every selected island's kept flag to the same value - all kept if any
+    // of them wasn't (the group popover's button reads "Keep" in that case), otherwise clearing
+    // all of them ("Unkeep", only shown once they're all already kept). Then behaves like
+    // toggleKeep: a real regenerate when the size rule could now remove or spare one of them,
+    // otherwise a straight re-annotate and re-render with the popover kept open.
+    function keepSelected(islands, keepAll) {
+        for (const island of islands) {
+            const key = seedKey(island.seed);
+            if (keepAll) state.kept.add(key); else state.kept.delete(key);
+        }
+        if (state.params.minIslandMm2 > 0) { regenerate({ keepPopover: true }); return; }
+        if (state.result) {
+            state.result.islands = state.result.islands.map((isl) => ({ ...isl, kept: state.kept.has(seedKey(isl.seed)) }));
+        }
+        renderCanvas();
+        renderSidebar();
+        syncPopover();
+    }
+
     // Pure: works out the clamped bridge width in px for any mm value without touching state, so
     // a one-off per-island width (popover Bridge/Place bridge) can't clobber the persistent
     // "Bridge width clamped" warning that tracks the global Bridge width setting. A bridge wider
@@ -314,18 +358,38 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         });
     }
 
+    // Group popover contents for a selection of more than one island: total area, Bridge
+    // selected/Delete selected/Keep-or-Unkeep selected, no Place bridge (a targeted bridge only
+    // makes sense for one island). Keep/Unkeep reads "Keep" as soon as any selected island isn't
+    // kept yet, and only reads "Unkeep" once every one of them already is.
+    function renderGroupPopoverContents(islands) {
+        const mm2 = islands.reduce((sum, isl) => sum + isl.area * state.scale * state.scale, 0);
+        const anyNotKept = islands.some((isl) => !isl.kept);
+        renderIslandPopover(popoverEl, { islands, mm2 }, {
+            bridgeMm: state.params.bridgeMm,
+            kept: !anyNotKept,
+            onBridge: (widthMm) => bridgeSelected(islands, widthMm),
+            onDelete: () => deleteSelected(islands),
+            onKeep: () => keepSelected(islands, anyNotKept),
+            onClose: () => closePopover(),
+        });
+    }
+
     // Re-reads the popover's island(s) from the current selection and the latest state.result
     // (data - area, kept flag, even whether an island still exists - can change out from under
-    // an open popover after a regenerate) and re-renders and repositions it in place, or closes
-    // it if nothing single-selected is left to show. A selection of more than one island has no
-    // popover yet (added alongside the group popover itself).
+    // an open popover after a regenerate) and re-renders and repositions it in place: the single-
+    // island popover for one selected island, the group popover for more than one, or closes it
+    // if the selection (after runPipeline's pruning) is now empty.
     function syncPopover() {
         if (!state.popover) return;
         const numbers = sortedSelected();
-        if (numbers.length !== 1) { closePopover(); return; }
-        const island = state.result && state.result.islands.find((i) => i.number === numbers[0]);
-        if (!island) { closePopover(); return; }
-        renderPopoverContents(island);
+        if (!numbers.length) { closePopover(); return; }
+        const islands = numbers
+            .map((n) => state.result && state.result.islands.find((i) => i.number === n))
+            .filter(Boolean);
+        if (!islands.length) { closePopover(); return; }
+        if (islands.length === 1) renderPopoverContents(islands[0]);
+        else renderGroupPopoverContents(islands);
         positionPopoverNow();
     }
 

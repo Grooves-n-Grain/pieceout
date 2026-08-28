@@ -136,7 +136,7 @@
                             <button id="btn-trace-undo" class="small-btn" title="Undo the last bridge or delete">Undo</button>
                         </div>
                     </div>
-                    <p id="trace-bridge-hint">Select an island, then Shift+click the material to place its bridge.</p>
+                    <p id="trace-bridge-hint">Click an island to select it. Shift+click adds to the selection, Ctrl+drag selects a region. Shift+click the material to place a bridge for a single selected island.</p>
                     <div id="trace-islands"></div>
                     <div id="trace-messages"></div>
                 </div>
@@ -173,6 +173,10 @@
                             <li><span class="legend-swatch line contour"></span> Cyan line: traced outline</li>
                             <li><span class="legend-number">1</span> Number: island id, stable for the life of the image</li>
                         </ul>
+                    </div>
+                    <div class="legend-section">
+                        <h4>Selecting islands</h4>
+                        <p><strong>Click</strong> an island (or its row in the list) to select just that one. <strong>Shift+click</strong> adds or removes it from the current selection instead of replacing it. <strong>Ctrl+drag</strong> on the canvas draws a box and selects every island fully inside it (Shift+drag adds to the selection). Selecting more than one island opens a group popover to bridge, delete, or keep them together. <strong>Esc</strong> clears the selection.</p>
                     </div>
                     <div class="legend-section">
                         <h4>Trace settings</h4>

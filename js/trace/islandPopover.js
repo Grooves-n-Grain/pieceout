@@ -1,8 +1,11 @@
 // js/trace/islandPopover.js
 /**
- * Per-island action popover: bridge, place a targeted bridge, delete, or keep - all from a
- * small box anchored next to whatever was clicked. Pure DOM building, same style as
- * traceSidebar.js; no state lives here beyond what's already in the DOM it builds.
+ * Per-island (or per-selection) action popover: bridge, place a targeted bridge, delete, or
+ * keep - all from a small box anchored next to whatever was clicked. Pure DOM building, same
+ * style as traceSidebar.js; no state lives here beyond what's already in the DOM it builds.
+ * renderIslandPopover branches into a group mode (no "Place bridge", since a targeted bridge
+ * only makes sense for one island) whenever `data.islands` is an array instead of a single
+ * island's own fields.
  */
 import { formatMm2 } from './traceSidebar.js';
 
@@ -16,13 +19,16 @@ function button(doc, text, title, onClick) {
     return btn;
 }
 
-export function renderIslandPopover(el, island, { bridgeMm, kept, onBridge, onPlace, onDelete, onKeep, onClose }) {
+export function renderIslandPopover(el, data, { bridgeMm, kept, onBridge, onPlace, onDelete, onKeep, onClose }) {
     const doc = el.ownerDocument;
     el.innerHTML = '';
+    const group = Array.isArray(data.islands);
 
     const header = doc.createElement('div');
     header.className = 'popover-header';
-    header.textContent = `Island ${island.number} (${formatMm2(island.mm2)} mm2)`;
+    header.textContent = group
+        ? `${data.islands.length} islands selected (${formatMm2(data.mm2)} mm2 total)`
+        : `Island ${data.number} (${formatMm2(data.mm2)} mm2)`;
     el.appendChild(header);
 
     const row = doc.createElement('div');
@@ -56,10 +62,17 @@ export function renderIslandPopover(el, island, { bridgeMm, kept, onBridge, onPl
 
     const buttons = doc.createElement('div');
     buttons.className = 'popover-buttons';
-    buttons.appendChild(button(doc, 'Bridge', 'Bridge to the body', () => onBridge(currentWidthMm())));
-    buttons.appendChild(button(doc, 'Place bridge', 'Click the material to place this bridge', () => onPlace(currentWidthMm())));
-    buttons.appendChild(button(doc, 'Delete', 'Remove this island', onDelete));
-    buttons.appendChild(button(doc, kept ? 'Unkeep' : 'Keep', kept ? 'Stop keeping this island' : 'Keep this island as a separate piece', onKeep));
+    buttons.appendChild(button(doc, group ? 'Bridge selected' : 'Bridge', 'Bridge to the body', () => onBridge(currentWidthMm())));
+    if (!group) {
+        // Placing a targeted bridge only makes sense for one island at a time.
+        buttons.appendChild(button(doc, 'Place bridge', 'Click the material to place this bridge', () => onPlace(currentWidthMm())));
+    }
+    buttons.appendChild(button(doc, group ? 'Delete selected' : 'Delete', group ? 'Remove the selected islands' : 'Remove this island', onDelete));
+    const keepLabel = (kept ? 'Unkeep' : 'Keep') + (group ? ' selected' : '');
+    const keepTitle = kept
+        ? (group ? 'Stop keeping the selected islands' : 'Stop keeping this island')
+        : (group ? 'Keep the selected islands as separate pieces' : 'Keep this island as a separate piece');
+    buttons.appendChild(button(doc, keepLabel, keepTitle, onKeep));
     el.appendChild(buttons);
 }
 
