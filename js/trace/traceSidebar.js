@@ -18,7 +18,7 @@ export function renderIslandList(container, countEl, islands, scaleMmPerPx, { se
     }
     islands.forEach((island) => {
         const row = document.createElement('div');
-        row.className = 'island-row' + (island.number === selected ? ' selected' : '') + (island.kept ? ' kept' : '');
+        row.className = 'island-row' + (selected.has(island.number) ? ' selected' : '') + (island.kept ? ' kept' : '');
         // traceUI re-resolves this row by number to (re)position an open popover after a
         // re-render, since the DOM node it last saw is gone as soon as this list rebuilds.
         row.dataset.islandNumber = String(island.number);
@@ -37,7 +37,7 @@ export function renderIslandList(container, countEl, islands, scaleMmPerPx, { se
             if (action === 'bridge') onBridge(island);
             else if (action === 'delete') onDelete(island);
             else if (action === 'keep') onKeep(island);
-            else onSelect(island, row);
+            else onSelect(island, { toggle: e.shiftKey });
         });
         container.appendChild(row);
     });

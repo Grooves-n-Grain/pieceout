@@ -39,7 +39,7 @@ function bboxRect(bbox, cls, extra = {}) {
     });
 }
 
-export function renderOverlay(canvas, { bitmap, islands, thin, bridges, shapes, selectedIsland }) {
+export function renderOverlay(canvas, { bitmap, islands, thin, bridges, shapes, selected }) {
     const { width: W, height: H } = bitmap;
     canvas.setAttribute('viewBox', `0 0 ${W} ${H}`);
     canvas.removeAttribute('width');
@@ -71,7 +71,7 @@ export function renderOverlay(canvas, { bitmap, islands, thin, bridges, shapes, 
     islands.forEach((island) => {
         const markClass = 'trace-island-mark' + (island.kept ? ' kept' : '');
         const rect = bboxRect(island.bbox, markClass, { 'data-island-number': island.number });
-        if (island.number === selectedIsland) rect.setAttribute('stroke-width', '3');
+        if (selected.has(island.number)) rect.setAttribute('stroke-width', '3');
         islandGroup.appendChild(rect);
         const fontSize = Math.max(8, Math.round(W / 80));
         const labelClass = 'trace-island-label' + (island.kept ? ' kept' : '');

@@ -12,6 +12,7 @@ import { createNumbering, seedKey, bulkTargets } from './islandNumbers.js';
 import { removeSmallIslands } from './sizeRule.js';
 import { renderIslandList, renderStats } from './traceSidebar.js';
 import { renderIslandPopover, positionPopover } from './islandPopover.js';
+import { islandsInRect } from './select.js';
 import { renderParamInputs, renderMessages } from '../layout/layoutForm.js';
 import { downloadText } from '../layout/download.js';
 import { parseSVG } from '../svgParser.js';
@@ -70,9 +71,9 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
 
     const state = {
         imageData: null, name: 'image', params: defaults(), panelName: '', ops: [],
-        base: null, edited: null, result: null, scale: 1, view: 'raster', selectedIsland: -1,
+        base: null, edited: null, result: null, scale: 1, view: 'raster', selected: new Set(),
         timingMs: 0, messages: [], regenerateMessages: [], opWarnings: [], panelMissing: false, bridgeClampPx: null,
-        numbering: createNumbering(), kept: new Set(), popover: null, placing: null,
+        numbering: createNumbering(), kept: new Set(), popover: null, placing: null, marquee: null,
     };
     let timer = null;
 
@@ -102,7 +103,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             renderOverlay(canvas, {
                 bitmap: state.result.bitmap, islands: state.result.islands, thin: state.result.thin,
                 bridges: state.ops.filter(o => o.kind === 'bridge'), shapes: state.result.shapes,
-                selectedIsland: state.selectedIsland,
+                selected: state.selected,
             });
         } else {
             const parsed = parseSVG(exportSvg(1));
@@ -115,23 +116,52 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         btnVector.textContent = state.view === 'raster' ? 'Vector' : 'Raster';
     }
 
+    // Returns the selected island's number when exactly one is selected, else null. Several
+    // single-island-only flows (Shift+click place-bridge, "place bridge" itself) need this rather
+    // than the raw set.
+    function singleSelected() {
+        return state.selected.size === 1 ? [...state.selected][0] : null;
+    }
+
+    // The selected numbers in ascending order. The popover always anchors to the lowest one,
+    // whichever kind of click (or marquee) produced the current selection.
+    function sortedSelected() {
+        return [...state.selected].sort((a, b) => a - b);
+    }
+
     // anchorKind is 'row' or 'mark' - which kind of element the popover should anchor next to
     // (a sidebar row or the canvas mark that was clicked). It's a descriptor, not the DOM node
     // itself: the node gets re-resolved by number every time the popover is (re)positioned,
     // since renderCanvas()/renderSidebar() above just tore down and rebuilt the DOM a moved-to
     // node would have pointed into. Omitted when the selection changes for some other reason,
     // in which case any open popover no longer applies to anything and is closed.
+    //
+    // A plain click/select always replaces the selection with just this one island (see
+    // toggleIslandSelection for Shift+click, which adds/removes instead).
     function selectIsland(number, anchorKind) {
         // Selecting a different island while "place bridge" targets one makes that mode
         // ambiguous (place it for the old island, or the one just clicked?) - cancel it rather
         // than guess, same as Escape would.
         if (state.placing && state.placing.number !== number) state.placing = null;
-        state.selectedIsland = number;
+        state.selected = new Set([number]);
         renderCanvas();
         renderSidebar();
         if (!anchorKind) { closePopover(); return; }
-        const island = state.result && state.result.islands.find((i) => i.number === number);
-        if (island) openPopover(island, anchorKind);
+        openPopover(anchorKind);
+    }
+
+    // Shift+click on a sidebar row or a canvas box: toggles that one island in or out of the
+    // selection, leaving the rest alone. Reopens/updates the popover to match whatever the
+    // selection now is (single island, group, or closed if it's now empty) - see openPopover.
+    function toggleIslandSelection(number, anchorKind) {
+        // A selection change makes any in-progress "place bridge" ambiguous, same as selectIsland.
+        state.placing = null;
+        if (state.selected.has(number)) state.selected.delete(number);
+        else state.selected.add(number);
+        renderCanvas();
+        renderSidebar();
+        if (state.selected.size === 0) { closePopover(); return; }
+        openPopover(anchorKind);
     }
 
     function renderHint() {
@@ -143,10 +173,11 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     function renderSidebar() {
         const r = state.result;
         renderIslandList(islandsEl, islandCountEl, r ? r.islands : [], state.scale, {
-            selected: state.selectedIsland,
-            // traceSidebar still hands back the row element (useful to other callers), but the
-            // popover only needs to know it came from a sidebar row - see selectIsland.
-            onSelect: (island) => selectIsland(island.number, 'row'),
+            selected: state.selected,
+            onSelect: (island, { toggle } = {}) => {
+                if (toggle) toggleIslandSelection(island.number, 'row');
+                else selectIsland(island.number, 'row');
+            },
             onBridge: (island) => pushOp({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() }),
             onDelete: (island) => pushOp({ kind: 'delete', seed: island.seed }),
             onKeep: (island) => toggleKeep(island),
@@ -232,10 +263,14 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     // scratch on every render (innerHTML = ''), which would otherwise detach the node the
     // popover was anchored to and leave it permanently mispositioned. Falls back to the other
     // kind of anchor if the one the popover was opened with no longer exists (e.g. a 'mark'
-    // anchor after switching to vector view, where the raster overlay isn't in the DOM).
+    // anchor after switching to vector view, where the raster overlay isn't in the DOM). The
+    // anchor number is always the lowest currently selected island - for a single selection
+    // that's just the island itself, for a group it's the one the popover's header describes as
+    // "first".
     function resolvePopoverAnchor() {
         if (!state.popover) return null;
-        const n = state.popover.number;
+        const n = sortedSelected()[0];
+        if (n === undefined) return null;
         const byRow = () => islandsEl.querySelector(`.island-row[data-island-number="${n}"]`);
         const byMark = () => canvas.querySelector(`rect[data-island-number="${n}"]`);
         const primary = state.popover.anchor === 'row' ? byRow() : byMark();
@@ -279,19 +314,27 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         });
     }
 
-    // Re-reads the popover's island from the latest state.result (its data - area, kept flag,
-    // even whether it still exists - can change out from under an open popover after a
-    // regenerate) and re-renders and repositions it in place, or closes it if the island is gone.
+    // Re-reads the popover's island(s) from the current selection and the latest state.result
+    // (data - area, kept flag, even whether an island still exists - can change out from under
+    // an open popover after a regenerate) and re-renders and repositions it in place, or closes
+    // it if nothing single-selected is left to show. A selection of more than one island has no
+    // popover yet (added alongside the group popover itself).
     function syncPopover() {
         if (!state.popover) return;
-        const island = state.result && state.result.islands.find((i) => i.number === state.popover.number);
+        const numbers = sortedSelected();
+        if (numbers.length !== 1) { closePopover(); return; }
+        const island = state.result && state.result.islands.find((i) => i.number === numbers[0]);
         if (!island) { closePopover(); return; }
         renderPopoverContents(island);
         positionPopoverNow();
     }
 
-    function openPopover(island, anchorKind) {
-        state.popover = { number: island.number, anchor: anchorKind };
+    // Opens (or refreshes) the popover for whatever is currently selected. The contents and
+    // anchor number are resolved fresh in syncPopover from the live selection/result rather than
+    // captured here, so a later selection change (toggling members in/out) updates the same
+    // popover in place instead of needing to be reopened.
+    function openPopover(anchorKind) {
+        state.popover = { anchor: anchorKind };
         popoverEl.hidden = false;
         syncPopover();
     }
@@ -364,7 +407,12 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             state.result.islands = state.numbering.assign(state.result.islands)
                 .map((island) => ({ ...island, kept: state.kept.has(seedKey(island.seed)) }));
             state.timingMs = performance.now() - t0;
-            if (!state.result.islands.some(i => i.number === state.selectedIsland)) state.selectedIsland = -1;
+            // Drop any selected number whose island no longer exists after this run, rather than
+            // clearing the whole selection - a regenerate that only removes one of several
+            // selected islands (bridged, deleted, fell under the size rule) should leave the rest
+            // selected.
+            const stillThere = new Set(state.result.islands.map((i) => i.number));
+            state.selected = new Set([...state.selected].filter((n) => stillThere.has(n)));
         } catch (err) {
             // Keep whatever state.result/edited already held (from the last successful run)
             // visible rather than clearing them, so a bad parameter doesn't blank the canvas.
@@ -411,7 +459,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         // An explicit bridge or delete on an island wins over a prior keep: there's no point
         // keeping an island the user just told the pipeline to bridge or remove.
         state.kept.delete(seedKey(op.seed));
-        state.selectedIsland = -1;
+        state.selected = new Set();
         regenerate();
     }
 
@@ -468,13 +516,18 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
 
     // Plain clicks select the island under the pointer, place a bridge while state.placing is
     // active (see "Place bridge" in the island popover), or - failing both - do nothing.
-    // Shift+click places a targeted bridge from the currently selected island to the clicked
-    // point using the global Bridge width, same as before "Place bridge" existed. Guarded so
-    // this never fires outside the Trace tab or its raster view (the canvas is shared with
-    // Preview/Layout, and vector view's viewBox is in mm, not bitmap pixels) and never treats
-    // the mouseup at the end of a pan drag as a click (viewport.js owns panning; it does not
-    // stop this 'click' from firing, so a moved-since-mousedown check is needed here to tell the
-    // two apart).
+    // Shift+click on an island box always toggles it in/out of the selection, never places a
+    // bridge; Shift+click on the material (no box under the pointer) places a targeted bridge
+    // from the single selected island to the clicked point using the global Bridge width, same
+    // as before multi-select existed - it needs exactly one island selected, since a bridge has
+    // to come from somewhere in particular. Guarded so this never fires outside the Trace tab or
+    // its raster view (the canvas is shared with Preview/Layout, and vector view's viewBox is in
+    // mm, not bitmap pixels) and never treats the mouseup at the end of a pan drag or a marquee
+    // drag as a click (viewport.js owns panning and the marquee mouseup below owns removing
+    // itself; neither stops this 'click' from firing, so a moved-since-mousedown check is needed
+    // here to tell a click apart from either kind of drag - a marquee drag under 3px is treated
+    // as nothing by the marquee handler, so falling through to a plain click/toggle here for it
+    // is harmless).
     let mouseDownPos = null;
     canvas.addEventListener('mousedown', (e) => { mouseDownPos = { x: e.clientX, y: e.clientY }; });
     canvas.addEventListener('click', (e) => {
@@ -489,14 +542,84 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             if (px) placeBridgeAt(px, state.placing.number, state.placing.widthPx);
             return;
         }
-        if (e.shiftKey) {
-            if (state.selectedIsland < 0) return;
-            const px = clientToPixel(e.clientX, e.clientY);
-            if (px) placeBridgeAt(px, state.selectedIsland, bridgePx());
+        const hit = e.target.closest && e.target.closest('[data-island-number]');
+        if (hit) {
+            const number = Number(hit.dataset.islandNumber);
+            if (e.shiftKey) toggleIslandSelection(number, 'mark');
+            else selectIsland(number, 'mark');
             return;
         }
-        const hit = e.target.closest && e.target.closest('[data-island-number]');
-        if (hit) selectIsland(Number(hit.dataset.islandNumber), 'mark');
+        if (e.shiftKey) {
+            if (state.selected.size > 1) { pushClickWarning('Select a single island to place a bridge.'); return; }
+            const single = singleSelected();
+            if (single === null) return;
+            const px = clientToPixel(e.clientX, e.clientY);
+            if (px) placeBridgeAt(px, single, bridgePx());
+        }
+    });
+
+    // --- Ctrl+drag marquee: select every island whose bbox is fully inside the dragged
+    // rectangle. Trace tab, raster view only - viewport.js's onMouseDown backs off entirely
+    // whenever ctrlKey is held (see the comment there), leaving the whole gesture to us.
+    let marqueeEl = null;
+
+    function updateMarqueeRect() {
+        if (!state.marquee || !marqueeEl) return;
+        const { x0, y0, x1, y1 } = state.marquee;
+        const p0 = clientToPixel(x0, y0);
+        const p1 = clientToPixel(x1, y1);
+        if (!p0 || !p1) return;
+        marqueeEl.setAttribute('x', Math.min(p0[0], p1[0]));
+        marqueeEl.setAttribute('y', Math.min(p0[1], p1[1]));
+        marqueeEl.setAttribute('width', Math.abs(p1[0] - p0[0]));
+        marqueeEl.setAttribute('height', Math.abs(p1[1] - p0[1]));
+    }
+
+    canvas.parentElement.addEventListener('mousedown', (e) => {
+        if (!e.ctrlKey || e.button !== 0) return;
+        if (!document.body.classList.contains('mode-trace')) return;
+        if (state.view !== 'raster' || !state.result) return;
+        e.preventDefault();
+        state.marquee = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY };
+        marqueeEl = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        marqueeEl.setAttribute('class', 'trace-marquee');
+        canvas.appendChild(marqueeEl);
+        updateMarqueeRect();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!state.marquee) return;
+        state.marquee.x1 = e.clientX;
+        state.marquee.y1 = e.clientY;
+        updateMarqueeRect();
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (!state.marquee) return;
+        const { x0, y0, x1, y1 } = state.marquee;
+        state.marquee = null;
+        if (marqueeEl) { marqueeEl.remove(); marqueeEl = null; }
+        // A drag under 3px is treated as nothing, not a click - the canvas 'click' handler above
+        // still runs on mouseup and handles that case on its own terms (select/toggle/place).
+        if (Math.hypot(x1 - x0, y1 - y0) < 3) return;
+        const p0 = clientToPixel(x0, y0);
+        const p1 = clientToPixel(x1, y1);
+        if (!p0 || !p1) return;
+        const rect = {
+            x0: Math.min(p0[0], p1[0]), y0: Math.min(p0[1], p1[1]),
+            x1: Math.max(p0[0], p1[0]), y1: Math.max(p0[1], p1[1]),
+        };
+        const hits = islandsInRect(state.result.islands, rect);
+        state.placing = null;
+        if (e.shiftKey) {
+            for (const island of hits) state.selected.add(island.number);
+        } else {
+            state.selected = new Set(hits.map((i) => i.number));
+        }
+        renderCanvas();
+        renderSidebar();
+        if (state.selected.size === 0) closePopover();
+        else openPopover('mark');
     });
 
     // Closes the popover on a click anywhere else - a mousedown listener rather than 'click' so
@@ -606,7 +729,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         state.imageData = ctx.getImageData(0, 0, width, height);
         state.name = file.name;
         state.ops = [];
-        state.selectedIsland = -1;
+        state.selected = new Set();
         state.numbering = createNumbering();
         state.kept = new Set();
         state.view = 'raster';
@@ -629,13 +752,13 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     btnBridgeAll.addEventListener('click', () => {
         if (!state.result) return;
         for (const island of bulkTargets(state.result.islands)) state.ops.push({ kind: 'bridge', seed: island.seed, widthPx: bridgePx() });
-        state.selectedIsland = -1;
+        state.selected = new Set();
         regenerate();
     });
     btnDeleteAll.addEventListener('click', () => {
         if (!state.result) return;
         for (const island of bulkTargets(state.result.islands)) state.ops.push({ kind: 'delete', seed: island.seed });
-        state.selectedIsland = -1;
+        state.selected = new Set();
         regenerate();
     });
     btnUndo.addEventListener('click', () => { state.ops.pop(); regenerate(); });
@@ -678,7 +801,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         toggleView,
         clearSelection() {
             let changed = false;
-            if (state.selectedIsland >= 0) { state.selectedIsland = -1; changed = true; }
+            if (state.selected.size) { state.selected = new Set(); changed = true; }
             if (state.placing) { state.placing = null; changed = true; }
             if (state.popover) { closePopover(); changed = true; }
             if (!changed) return;

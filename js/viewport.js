@@ -201,6 +201,8 @@ function onWheel(e) {
 }
 
 function onMouseDown(e) {
+    // Ctrl+drag is reserved for tools that own selection (the Trace marquee); back off entirely.
+    if (e.ctrlKey) return;
     // Pan with left button or middle button
     if (e.button === 0 || e.button === 1) {
         isPanning = true;
