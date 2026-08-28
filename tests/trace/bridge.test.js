@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import { bitmapFromStrings, bitmapToStrings, getPixel } from '../../js/trace/bitmap.js';
 import { labelComponents, findIslands } from '../../js/trace/components.js';
-import { stampDisc, bridgeIsland, bridgeIslandTo, deleteIsland, applyOps } from '../../js/trace/bridge.js';
+import { stampDisc, bridgeIsland, bridgeIslandTo, deleteIsland, applyOps, nearestBodyPixel } from '../../js/trace/bridge.js';
 
 const framed = () => bitmapFromStrings([
     '#######',
@@ -366,4 +366,17 @@ test('applyOps drops a delete for an island a bridge fused into the body diagona
     assert.deepEqual(r.dropped.map((d) => d.reason), ['merged']);
     assert.equal(getPixel(r.bitmap, 3, 4), 1, "C's pixels are still black");
     assert.equal(findIslands(r.bitmap).length, 0);
+});
+
+test('nearestBodyPixel snaps a near miss to the closest body pixel and ignores islands', () => {
+    // 7x5: a body bar along the top row, a lone island pixel at (3,3), white elsewhere.
+    const W = 7, H = 5;
+    const data = new Uint8Array(W * H);
+    for (let x = 0; x < W; x++) data[x] = 1;
+    data[3 * W + 3] = 1;
+    const bm = { width: W, height: H, data };
+    const a = labelComponents(bm, 1);
+    assert.deepEqual(nearestBodyPixel(bm, a, 3, 2, 2), [3, 0]);
+    assert.equal(nearestBodyPixel(bm, a, 3, 4, 1.5), null, 'only the island is within reach');
+    assert.deepEqual(nearestBodyPixel(bm, a, 5, 0, 0), [5, 0], 'a direct hit snaps to itself');
 });

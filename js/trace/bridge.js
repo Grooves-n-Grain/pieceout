@@ -104,6 +104,27 @@ export function bridgeIslandTo(bitmap, analysis, islandId, target, widthPx) {
     return stampPath(bitmap, path, widthPx);
 }
 
+// Nearest body pixel to (x, y) within `radius` (Euclidean, in bitmap pixels), or null. A click
+// on a one-pixel-wide feature at screen zoom easily lands on the white beside it; snapping to
+// the closest body pixel turns that near miss into the bridge the user meant.
+export function nearestBodyPixel(bitmap, analysis, x, y, radius) {
+    const { width: W, height: H, data } = bitmap;
+    const { labels, body } = analysis;
+    const R = Math.ceil(radius);
+    let best = null, bestD = radius * radius + 1e-9;
+    for (let dy = -R; dy <= R; dy++) {
+        for (let dx = -R; dx <= R; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+            const d = dx * dx + dy * dy;
+            if (d >= bestD) continue;
+            const i = ny * W + nx;
+            if (data[i] === 1 && body[labels[i]]) { best = [nx, ny]; bestD = d; }
+        }
+    }
+    return best;
+}
+
 export function deleteIsland(bitmap, analysis, islandId) {
     const out = cloneBitmap(bitmap);
     const { labels } = analysis;

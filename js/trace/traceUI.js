@@ -4,7 +4,7 @@
  * trace pipeline, raster or vector view on the shared canvas, export.
  */
 import { imageToBitmap } from './raster.js';
-import { applyOps, bridgeIslandTo } from './bridge.js';
+import { applyOps, bridgeIslandTo, nearestBodyPixel } from './bridge.js';
 import { labelComponents } from './components.js';
 import { tracePipeline, shapesToSVG } from './svg.js';
 import { renderOverlay } from './overlay.js';
@@ -556,16 +556,19 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         if (!island) return;
         const verb = state.placing ? 'Click' : 'Shift+click';
         const bm = state.edited;
-        const inBounds = x >= 0 && y >= 0 && x < bm.width && y < bm.height;
-        if (!inBounds || bm.data[y * bm.width + x] !== 1) {
-            pushClickWarning(`${verb} on the material to place the bridge.`);
-            return;
-        }
         const a = labelComponents(bm, 1, state.params.minSpeck);
-        if (!a.body[a.labels[y * bm.width + x]]) {
+        // Snap to the nearest body pixel within about 8 screen pixels: thin features (a nose
+        // line, a whisker) are a pixel or two wide in the bitmap, so an on-target click at screen
+        // zoom often lands on the white right beside them.
+        const ctm = canvas.getScreenCTM();
+        const screenPxPerBitmapPx = ctm ? Math.hypot(ctm.a, ctm.b) : 1;
+        const radius = Math.max(1, 8 / screenPxPerBitmapPx);
+        const snapped = nearestBodyPixel(bm, a, x, y, radius);
+        if (!snapped) {
             pushClickWarning(`${verb} on the material to place the bridge.`);
             return;
         }
+        [x, y] = snapped;
         // The click landed on body, but that alone doesn't mean this island can actually reach
         // it - a wall of other islands can seal it off entirely. Try the real bridge here, on
         // the same analysis, before committing to the op: a click with no open path across white
