@@ -39,6 +39,24 @@ In the **export heightmap**, white (65535) is the untouched material face; black
 
 The PNG carries normalized heights, **not an automatically enforced physical cutting depth**. In Aspire, use **Create Component from Bitmap** with no bitmap selected and choose the PNG directly. Vectric recommends this route to preserve 16-bit shades ([official documentation](https://docs.vectric.com/docs/V12.0/Aspire/ENU/Help/form/create-component-from-bitmap/)). Set the physical component dimensions and height from the JSON, and position the white plane at the original stock face. Check the component orientation, background and material removal in Aspire before generating toolpaths. PieceOut does not generate or simulate toolpaths, cutter reach, stock thickness or machining setups. Successful import and carving quality must be verified with the actual Aspire version and source artwork.
 
+## What the preview views mean
+
+| View | What it shows | How to read it |
+| --- | --- | --- |
+| Original image | The working source image, resized if needed | Use it to compare the estimated shapes with the artwork. |
+| AI depth | A grayscale visualization of the model's estimated camera distances | Lighter means nearer the camera; darker means farther away. This view does not apply your carving controls or mask. |
+| Carving area | The combined source alpha, optional uploaded mask and background limit | White allows carving; black protects the face. Gray permits partial carving. It describes coverage, not cutting depth. |
+| Shaded relief | The processed surface under simulated light | Judge the recessed shape here. Brightness depends on lighting and slope, so it is not a height measurement. |
+| Export heightmap | A grayscale preview of the processed surface | White is the untouched face; darker means deeper. Black represents the maximum configured recess. This is the shape represented by the downloaded PNG. |
+
+For a vine, a section that appears bright in **AI depth** is estimated to be close to the camera. In the current recessed mode, that near geometry becomes a deeper impression and generally appears dark in **Export heightmap**. The protected background stays white. Masking, clipping, shape compression, contrast and smoothing mean the export is more than a simple inversion of the depth preview.
+
+Both grayscale views displayed in the browser are **8-bit previews**. The model's source data is retained separately as floating-point `raw_depth.npy`, and **Download 16-bit PNG** returns `relief_16bit.png` directly from the service. Saving a screenshot or the displayed preview is not equivalent to downloading that file.
+
+With a maximum depth of 3 mm, white corresponds to 0 mm removed, halfway gray to about 1.5 mm removed, and black to 3 mm removed, assuming the component is scaled and positioned accordingly in Aspire. Some settings produce a shallower result that never reaches black. Changing maximum depth scales the physical carving and shaded preview; it does not change the normalized grayscale heightmap by itself.
+
+Relief adjustments leave the underlying AI depth unchanged. Use **AI depth** to assess what the model inferred, **Carving area** to check what is protected, and **Shaded relief** plus **Export heightmap** to assess the result you will take into Aspire.
+
 ## CLI and cached-depth processing
 
 The same pipeline works without the browser. Use container-visible paths and mount source/output folders:

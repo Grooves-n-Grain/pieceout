@@ -49,6 +49,8 @@ The optional **Relief** tab creates a heightmap for carving artwork into the fro
 
 The surrounding face stays white (uncut); darker pixels represent deeper recesses. Transparent source areas and optional grayscale masks protect the face. Depth-based background removal needs visual checking: it does not automatically identify vines or other subjects.
 
+**AI depth** shows estimated camera distance (lighter is nearer). **Export heightmap** shows the processed carving (white is the untouched face, darker is deeper), after your carving-area and shape adjustments. The browser shows 8-bit previews; use **Download 16-bit PNG** for the full-precision export. See [what each Relief view means](services/relief/README.md#what-the-preview-views-mean).
+
 Relief uses an optional local NVIDIA GPU service. The existing three tabs remain browser-only and dependency-free. Start the service with:
 
 ```bash
