@@ -31,3 +31,4 @@ __pycache__/
 *.pyc
 services/relief/data/
 services/relief/models/
+services/relief/.env
