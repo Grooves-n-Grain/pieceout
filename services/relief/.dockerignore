@@ -1,0 +1,5 @@
+*
+!requirements*.txt
+!relief/
+!relief/**
+**/__pycache__

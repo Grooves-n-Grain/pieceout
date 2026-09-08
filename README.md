@@ -43,6 +43,20 @@ The **Trace** tab turns a black and white image into a smooth vector cut file wi
 
 The tracer is written from scratch (contour following plus cubic Bezier fitting) so the repo stays MIT and dependency free.
 
+## Relief tab: image to recessed carving
+
+The optional **Relief** tab creates a heightmap for carving artwork into the front face of material. Upload an image, set width and maximum depth, generate AI depth, then adjust the carving area, shape and smoothing. Preview the mask, shaded surface or grayscale heightmap and download a genuine 16-bit PNG plus physical size/settings for Aspire.
+
+The surrounding face stays white (uncut); darker pixels represent deeper recesses. Transparent source areas and optional grayscale masks protect the face. Depth-based background removal needs visual checking: it does not automatically identify vines or other subjects.
+
+Relief uses an optional local NVIDIA GPU service. The existing three tabs remain browser-only and dependency-free. Start the service with:
+
+```bash
+docker compose -p pieceout-relief -f services/relief/compose.yaml up -d --build
+```
+
+Then run `node serve.js` as usual. See the [Relief setup and workflow](services/relief/README.md) for GPU selection, saved jobs, CLI usage and Aspire checks. Relief controls reuse saved depth rather than running AI again.
+
 ## Why
 
 It was tedious to have to double-click every piece I wanted cut-out in the preview. With really intricate cuts this used to take a lot of time, and if you messed it up, you only had one `undo.` PieceOut gives you the ability to instantly see everything cut out, allowing you to identify any issues.
@@ -72,7 +86,7 @@ Mouse wheel zooms; click-drag pans; pinch + one-finger pan work on touch devices
 
 ## How it works
 
-Seven vanilla JS modules, loaded directly as ES6 modules from `index.html`:
+Vanilla JS modules, loaded directly as ES6 modules from `index.html`:
 
 - **[`js/svgParser.js`](js/svgParser.js)** — DOMParser-based SVG parsing. Extracts layers from `<g>` elements via `inkscape:label` or `id`. Collects all shape primitives (path / polygon / rect / circle / ellipse / line) per layer.
 - **[`js/layerTagger.js`](js/layerTagger.js)** — keyword-based auto-classification with localStorage-persisted overrides.
@@ -81,6 +95,8 @@ Seven vanilla JS modules, loaded directly as ES6 modules from `index.html`:
 - **[`js/app.js`](js/app.js)** — orchestrator. State, file upload, view modes, PNG export.
 - **[`js/layout/`](js/layout/)**: the Layout tab. `templates/andonLamp.js` derives parts and joinery from lamp dimensions, `joints/` holds the half-lap and dowel-hole generators, `nest.js` packs parts onto sheets, `svgWriter.js` serialises a sheet to a true-size layered SVG, and `layoutUI.js` / `layoutForm.js` drive the sidebar. Everything below the UI is pure and unit-tested.
 - **[`js/trace/`](js/trace/)**: the Trace tab. Pure raster pipeline (bitmap, components, contours, simplify, Bezier fit, thin features, bridging, SVG) plus the controller and overlay renderer.
+
+- **[`js/relief/`](js/relief/)**: the Relief tab and same-origin API client. The optional Python/GPU service lives in [`services/relief/`](services/relief/).
 
 ## Tests
 

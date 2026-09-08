@@ -24,3 +24,10 @@ Thumbs.db
 
 # Playwright MCP browser-session output
 .playwright-mcp/
+
+# Optional relief service: local environments and generated data
+.venv/
+__pycache__/
+*.pyc
+services/relief/data/
+services/relief/models/

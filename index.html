@@ -14,6 +14,7 @@
                 <button id="tab-preview" class="tab-btn active" data-tab="preview">Preview</button>
                 <button id="tab-layout" class="tab-btn" data-tab="layout">Layout</button>
                 <button id="tab-trace" class="tab-btn" data-tab="trace">Trace</button>
+                <button id="tab-relief" class="tab-btn" data-tab="relief">Relief</button>
             </nav>
             <div id="toolbar">
                 <span class="preview-only toolbar-group">
@@ -143,6 +144,55 @@
                 <div id="trace-stats"></div>
             </aside>
 
+            <aside id="relief-sidebar" class="relief-only">
+                <div class="relief-heading">
+                    <h2>Recessed relief</h2>
+                    <p>Carve artwork into the face of your material.</p>
+                </div>
+                <div id="relief-form">
+                    <button id="relief-open" class="small-btn">Open image</button>
+                    <input id="relief-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+                    <p id="relief-source-name" class="relief-help">PNG, JPG or WebP · up to 20 MB</p>
+                    <details class="relief-mask-controls">
+                        <summary>Optional carving mask</summary>
+                        <p class="relief-help">Use a matching grayscale image. White allows carving; black protects the face. Transparent areas in your source are protected automatically.</p>
+                        <label for="relief-mask">Mask image</label>
+                        <input id="relief-mask" type="file" accept="image/png,image/jpeg,image/webp">
+                        <button id="relief-clear-mask" class="small-btn" disabled>Clear mask</button>
+                    </details>
+                    <form id="relief-settings" onsubmit="return false">
+                        <fieldset>
+                            <legend>Carving size</legend>
+                            <div class="param-row"><label for="relief-width">Width</label><input id="relief-width" name="width_mm" type="number" min="0.1" max="10000" step="any" value="40" required><span class="unit">mm</span></div>
+                            <div class="param-row"><label for="relief-depth">Maximum depth</label><input id="relief-depth" name="depth_mm" type="number" min="0.01" max="100" step="any" value="3" required><span class="unit">mm</span></div>
+                            <p id="relief-size" class="relief-help">Height follows the image proportions.</p>
+                        </fieldset>
+                        <fieldset>
+                            <legend>Relief shape</legend>
+                            <label class="relief-slider" for="relief-background">Background limit <input id="relief-background" name="background_threshold" type="range" min="0.01" max="1" step="0.01" value="0.9"></label>
+                            <p class="relief-help">Lower to exclude distant areas. Check the Carving area view; depth alone does not identify the vine.</p>
+                            <label class="relief-slider" for="relief-gamma">Shape compression <input id="relief-gamma" name="gamma" type="range" min="0.25" max="4" step="0.05" value="1"></label>
+                            <label class="relief-slider" for="relief-contrast">Contrast <input id="relief-contrast" name="contrast" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+                            <label class="relief-slider" for="relief-smoothing">Smoothing <input id="relief-smoothing" name="smoothing" type="range" min="0" max="10" step="0.25" value="1"></label>
+                        </fieldset>
+                        <details>
+                            <summary>Depth clipping</summary>
+                            <div class="param-row"><label for="relief-near">Near clip</label><input id="relief-near" name="near_percentile" type="number" min="0" max="99" step="any" value="1" required><span class="unit">%</span></div>
+                            <div class="param-row"><label for="relief-far">Far clip</label><input id="relief-far" name="far_percentile" type="number" min="1" max="100" step="any" value="99" required><span class="unit">%</span></div>
+                        </details>
+                    </form>
+                    <button id="relief-generate" class="toolbar-btn" disabled>Generate depth</button>
+                    <progress id="relief-progress" aria-label="Relief processing" hidden></progress>
+                    <p id="relief-status" role="status" aria-live="polite">Connecting to the relief service…</p>
+                    <button id="relief-reconnect" class="small-btn">Reconnect</button>
+                    <div class="relief-exports">
+                        <a id="relief-download" class="toolbar-btn" data-file="relief_16bit.png" download="pieceout-relief-16bit.png" aria-disabled="true">Download 16-bit PNG</a>
+                        <a id="relief-metadata" data-file="metadata.json" download="pieceout-relief-settings.json" aria-disabled="true">Download size &amp; settings</a>
+                        <p class="relief-help">White is the untouched face; darker values carve deeper. Set the component size and depth in Aspire and check its placement against the stock face.</p>
+                    </div>
+                </div>
+            </aside>
+
             <div id="viewport-container">
                 <div id="drop-zone" class="visible">
                     <div id="drop-zone-content">
@@ -153,6 +203,21 @@
                         <p class="sub">or click to browse</p>
                         <input type="file" id="file-input" accept=".svg" hidden>
                     </div>
+                </div>
+                <div id="relief-preview-controls" class="relief-only">
+                    <label for="relief-view">View</label>
+                    <select id="relief-view">
+                        <option value="source">Original image</option>
+                        <option value="mask">Carving area</option>
+                        <option value="depth">AI depth</option>
+                        <option value="shaded" selected>Shaded relief</option>
+                        <option value="heightmap">Export heightmap</option>
+                    </select>
+                </div>
+                <div id="relief-empty" class="relief-only">
+                    <h2>From artwork to carved detail</h2>
+                    <p>Open an image to prepare a recessed relief for Aspire.</p>
+                    <button id="relief-empty-open" class="toolbar-btn">Choose an image</button>
                 </div>
                 <div id="viewport">
                     <svg id="svg-canvas" xmlns="http://www.w3.org/2000/svg"></svg>

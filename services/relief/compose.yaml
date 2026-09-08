@@ -1,0 +1,25 @@
+services:
+  relief:
+    build: .
+    image: pieceout-relief:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${RELIEF_PORT:-8766}:8766"
+    volumes:
+      - ${RELIEF_DATA_PATH:-./data}:/data
+      - relief-models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${RELIEF_GPU:-0}"]
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8766/api/relief/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+volumes:
+  relief-models:
+    name: pieceout-relief-models

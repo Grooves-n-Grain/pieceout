@@ -17,6 +17,7 @@ import {
 } from './viewport.js';
 import { initLayout } from './layout/layoutUI.js';
 import { initTrace } from './trace/traceUI.js';
+import { initRelief } from './relief/reliefUI.js';
 
 // --- State ---
 let parsedSVG = null;
@@ -30,7 +31,7 @@ const canvas = document.getElementById('svg-canvas');
 const viewport = document.getElementById('viewport');
 const layerListEl = document.getElementById('layer-list');
 
-let activeTab = 'preview'; // 'preview' | 'layout' | 'trace'
+let activeTab = 'preview'; // 'preview' | 'layout' | 'trace' | 'relief'
 const tabViews = {}; // per-tab saved pan/zoom, keyed by tab name
 const tabButtons = document.querySelectorAll('.tab-btn');
 
@@ -85,6 +86,10 @@ container.addEventListener('drop', (e) => {
     dropZone.classList.remove('drag-over');
 
     const file = e.dataTransfer?.files[0];
+    if (activeTab === 'relief') {
+        if (file) relief.loadFile(file);
+        return;
+    }
     if (activeTab === 'trace') {
         if (file) trace.loadFile(file);
         return;
@@ -144,7 +149,7 @@ function loadSVGContent(svgText) {
 // --- View mode switching ---
 
 function applyView() {
-    if (!parsedSVG) return;
+    if (activeTab !== 'preview' || !parsedSVG) return;
 
     const bgColor = getBackgroundColor();
 
@@ -180,6 +185,7 @@ function setTab(tab) {
     document.body.classList.toggle('mode-preview', tab === 'preview');
     document.body.classList.toggle('mode-layout', tab === 'layout');
     document.body.classList.toggle('mode-trace', tab === 'trace');
+    document.body.classList.toggle('mode-relief', tab === 'relief');
     tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
 
     if (tab === 'preview') {
@@ -194,6 +200,8 @@ function setTab(tab) {
         }
     } else if (tab === 'layout') {
         layout.show();
+    } else if (tab === 'relief') {
+        relief.show();
     } else {
         trace.show();
     }
@@ -355,6 +363,8 @@ const trace = initTrace({
     onSendToPreview: sendToPreview,
     getBackground: getBackgroundColor,
 });
+
+const relief = initRelief({ canvas, isActive: () => activeTab === 'relief' });
 
 // The browser restores #bg-select's value on reload but never fires its change event, so
 // apply it explicitly before the first tab render.
