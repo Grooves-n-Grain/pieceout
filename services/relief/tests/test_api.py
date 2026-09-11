@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 from fastapi.testclient import TestClient
 from relief.api import create_app
+from pillow_heif import from_pillow
 
 
 def source_bytes(size=(24, 36)):
@@ -75,6 +76,47 @@ class APITests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         response = self.client.post('/api/relief/jobs', files={'image': ('x.png', source_bytes()), 'mask': ('m.png', source_bytes((3, 3)))})
         self.assertEqual(response.status_code, 422)
+
+    def test_heif_preview_and_generation_accept_original_bytes(self):
+        output = io.BytesIO()
+        from_pillow(Image.new('RGB', (24, 36), 'green')).save(output)
+        # The bytes decide the format, even if the browser reports JPEG.
+        files = {'image': ('photo.jpg', output.getvalue(), 'image/jpeg')}
+        preview = self.client.post('/api/relief/images/preview', files=files)
+        self.assertEqual(preview.status_code, 200, preview.text[:100])
+        self.assertEqual(preview.headers['content-type'], 'image/png')
+        with Image.open(io.BytesIO(preview.content)) as image:
+            self.assertEqual(image.size, (24, 36))
+        self.assertEqual(self.engine.calls, 0)
+        self.assertEqual(list(Path(self.temp.name).iterdir()), [])
+        response = self.client.post('/api/relief/jobs', files=files)
+        self.assertEqual(response.status_code, 202, response.text)
+        self.wait(response.json()['id'])
+
+    def test_preview_is_bounded_and_preserves_alpha(self):
+        output = io.BytesIO()
+        Image.new('RGBA', (1000, 2000), (0, 255, 0, 100)).save(output, format='PNG')
+        response = self.client.post('/api/relief/images/preview', files={'image': ('x.png', output.getvalue())})
+        self.assertEqual(response.status_code, 200)
+        with Image.open(io.BytesIO(response.content)) as image:
+            self.assertEqual(image.size, (960, 1920))
+            self.assertEqual(image.getpixel((0, 0))[3], 100)
+
+    def test_preview_rejects_bad_or_oversized_files(self):
+        for data, expected in [(b'not an image', 422), (b'x' * (20 * 1024 * 1024 + 65537), 413)]:
+            with self.subTest(expected=expected):
+                response = self.client.post('/api/relief/images/preview', files={'image': ('x.heic', data)})
+                self.assertEqual(response.status_code, expected)
+
+    def test_corrupt_heif_payload_returns_validation_error(self):
+        data = (Path(__file__).parent / 'fixtures/damaged-payload.heic').read_bytes()
+        for endpoint in ('/api/relief/images/preview', '/api/relief/jobs'):
+            with self.subTest(endpoint=endpoint):
+                response = self.client.post(endpoint, files={'image': ('damaged.heic', data, 'image/heic')})
+                self.assertEqual(response.status_code, 422)
+                self.assertIn('HEIC/HEIF', response.json()['detail'])
+                self.assertIn('damaged or incomplete', response.json()['detail'])
+
     def test_invalid_controls_are_not_queued(self):
         job = self.create()
         self.wait(job)

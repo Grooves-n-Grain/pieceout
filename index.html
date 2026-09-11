@@ -151,13 +151,13 @@
                 </div>
                 <div id="relief-form">
                     <button id="relief-open" class="small-btn">Open image</button>
-                    <input id="relief-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
-                    <p id="relief-source-name" class="relief-help">PNG, JPG or WebP · up to 20 MB</p>
+                    <input id="relief-file" type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif,image/heic-sequence,image/heif-sequence,.heic,.heif,.heics,.heifs,.hif" hidden>
+                    <p id="relief-source-name" class="relief-help">PNG, JPG, WebP or HEIC/HEIF · up to 20 MB</p>
                     <details class="relief-mask-controls">
                         <summary>Optional carving mask</summary>
                         <p class="relief-help">Use a matching grayscale image. White allows carving; black protects the face. Transparent areas in your source are protected automatically.</p>
                         <label for="relief-mask">Mask image</label>
-                        <input id="relief-mask" type="file" accept="image/png,image/jpeg,image/webp">
+                        <input id="relief-mask" type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif,image/heic-sequence,image/heif-sequence,.heic,.heif,.heics,.heifs,.hif">
                         <button id="relief-clear-mask" class="small-btn" disabled>Clear mask</button>
                     </details>
                     <form id="relief-settings" onsubmit="return false">

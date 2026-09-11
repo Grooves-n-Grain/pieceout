@@ -45,7 +45,7 @@ The tracer is written from scratch (contour following plus cubic Bezier fitting)
 
 ## Relief tab: image to recessed carving
 
-The optional **Relief** tab creates a heightmap for carving artwork into the front face of material. Upload an image, set width and maximum depth, generate AI depth, then adjust the carving area, shape and smoothing. Preview the mask, shaded surface or grayscale heightmap and download a genuine 16-bit PNG plus physical size/settings for Aspire.
+The optional **Relief** tab creates a heightmap for carving artwork into the front face of material. Upload a PNG, JPEG, WebP or HEIC/HEIF photo, set width and maximum depth, generate AI depth, then adjust the carving area, shape and smoothing. HEIC photos from an iPad are converted automatically for preview. Preview the mask, shaded surface or grayscale heightmap and download a genuine 16-bit PNG plus physical size/settings for Aspire.
 
 The surrounding face stays white (uncut); darker pixels represent deeper recesses. Transparent source areas and optional grayscale masks protect the face. Depth-based background removal needs visual checking: it does not automatically identify vines or other subjects.
 

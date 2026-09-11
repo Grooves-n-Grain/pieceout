@@ -1,5 +1,6 @@
 /** Relief controller: saved jobs, settings and raster previews on the shared viewport. */
 import * as api from './api.js';
+import { loadImagePreview } from './imagePreview.js';
 import { setInitialView } from '../viewport.js';
 
 const STORE = 'pieceout-relief-job';
@@ -125,25 +126,21 @@ export function initRelief({ canvas, isActive }) {
         } finally { checking = false; updateControls(); }
     }
     async function loadFile(file) {
-        if (file.size > 20 * 1024 * 1024) { message('Choose an image smaller than 20 MB.', true); return; }
         const token = ++selection;
-        const url = URL.createObjectURL(file);
+        message('Opening image…');
         try {
-            const image = new Image();
-            image.src = url;
-            await image.decode();
+            const { url, width: imageWidth, height: imageHeight } = await loadImagePreview(file);
             if (token !== selection) { URL.revokeObjectURL(url); return; }
-            if (image.naturalWidth * image.naturalHeight > 16000000 || Math.min(image.naturalWidth, image.naturalHeight) < 2) throw new Error('Choose an image between 2 × 2 and 16 million pixels.');
             ++epoch;
             clearTimeout(polling); clearTimeout(debounce);
             if (sourceURL) URL.revokeObjectURL(sourceURL);
             sourceURL = url; source = file; mask = null; job = null; busy = false; dirty = false; maskDirty = false;
-            width = image.naturalWidth; height = image.naturalHeight;
+            width = imageWidth; height = imageHeight;
             maskInput.value = ''; remember(null); needsFit = true;
             $('relief-source-name').textContent = file.name;
             message(connected ? 'Image ready. Generate depth to begin.' : 'Image ready. Reconnect to the relief service to generate depth.');
             render();
-        } catch (error) { URL.revokeObjectURL(url); message(error.message || 'This image could not be opened.', true); }
+        } catch (error) { if (token === selection) message(error.message || 'This image could not be opened.', true); }
     }
     async function submit() {
         if (!source || busy || !valid()) return;

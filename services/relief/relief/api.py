@@ -5,11 +5,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 from .engines.patchfusion import PatchFusionEngine
-from .images import MAX_UPLOAD_BYTES, prepare_image
+from .images import MAX_UPLOAD_BYTES, prepare_image, preview_image
 from .jobs import Jobs, JobBusy, QueueFull
 from .settings import ReliefSettings
 
@@ -22,7 +22,12 @@ class UploadLimit:
     async def __call__(self, scope, receive, send):
         if scope['type'] != 'http' or scope['method'] not in {'POST', 'PUT', 'PATCH'}:
             return await self.app(scope, receive, send)
-        limit = 2 * MAX_UPLOAD_BYTES + 65536 if scope['path'].endswith('/jobs') else 65536
+        if scope['path'] == '/api/relief/jobs':
+            limit = 2 * MAX_UPLOAD_BYTES + 65536
+        elif scope['path'] == '/api/relief/images/preview':
+            limit = MAX_UPLOAD_BYTES + 65536
+        else:
+            limit = 65536
         chunks = []
         size = 0
         while True:
@@ -89,6 +94,16 @@ def create_app(data_dir=None, engine=None):
                 raise ValueError('Unknown relief setting.') from exc
             rgb, coverage = await run_in_threadpool(prepare_image, image_data, mask_data)
             return await run_in_threadpool(app.state.jobs.create, rgb, coverage, settings)
+
+    @app.post('/api/relief/images/preview')
+    async def preview(request: Request):
+        async with request.form(max_files=1, max_fields=0) as form:
+            image = form.get('image')
+            if image is None or not hasattr(image, 'read'):
+                raise ValueError('Choose an image to open.')
+            data = await image.read(MAX_UPLOAD_BYTES + 1)
+            png = await run_in_threadpool(preview_image, data)
+            return Response(png, media_type='image/png', headers={'Cache-Control': 'no-store'})
 
     @app.get('/api/relief/jobs/{job_id}')
     def status(job_id: str):

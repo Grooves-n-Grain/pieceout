@@ -28,12 +28,14 @@ The service and proxy are intended for your own trusted workshop network. If Pie
 
 ## Prepare a recessed carving
 
-1. Open a PNG, JPEG or WebP (20 MB and 16 million pixels maximum). Images larger than 1920 pixels on either side are reduced with their proportions preserved.
+1. Open a PNG, JPEG, WebP or HEIC/HEIF (20 MB and 16 million pixels maximum). Camera orientation is applied automatically. Images larger than 1920 pixels on either side are reduced with their proportions preserved.
 2. Set the physical width and maximum carving depth. Height follows the image aspect ratio.
 3. Optionally provide a mask with exactly the source image's dimensions. White permits carving; black protects the face. Source alpha also protects transparent areas. A photographic depth threshold cannot reliably identify a vine against every background, so inspect the carving area.
 4. Generate depth. The **Carving area** view shows the actual allowed region after the background limit. White is permitted and black is protected in this mask view.
 5. Adjust background limit, shape compression (gamma), contrast, smoothing and clipping. These use saved floating-point depth and **do not run the neural network again**. Smoothing is measured in working-image pixels. Changing a source or uploaded mask currently requires Generate depth again; selected mask changes keep export disabled until applied.
 6. Download the **16-bit PNG** and **size & settings** file. The last job is restored when you reopen the Relief tab in the same browser.
+
+HEIC/HEIF photos can be selected directly from an iPad photo library. The service creates a temporary PNG preview when you open a HEIC image, or when the browser cannot decode an image itself. This requires the Relief service to be online but does not load the depth model or create a job. Generate depth uploads the original file; source and mask validation uses their oriented dimensions. For HEIF collections, only the primary image is used. Decoding uses the [Pillow HEIF plugin](https://pillow-heif.readthedocs.io/en/stable/pillow-plugin.html); no browser conversion library is needed. The export remains a 16-bit PNG.
 
 In the **export heightmap**, white (65535) is the untouched material face; black (0) is the maximum recess. This differs from the mask view. The normalized surface is `1 - coverage * carving_strength`; physical Z is `(surface - 1) * depth_mm`. Pixels outside the final mask stay exactly white, even after smoothing or contrast. The closest parts of the estimated subject become its deepest recessed parts. This is an inverted impression, not a raised vine sitting within a pocket.
 
