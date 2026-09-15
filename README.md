@@ -35,7 +35,7 @@ All geometry is true part geometry. Tool offsets, tabs, and feeds stay in your C
 
 The **Trace** tab turns a black and white image into a smooth vector cut file without leaving the browser. Black is the material that stays, white is what the laser removes.
 
-1. Open or drop a PNG, JPG, or WebP. Adjust threshold, invert, smoothness (how far the curves may stray from the pixels), and the speck size to ignore.
+1. Open or drop a PNG, JPG, or WebP. Adjust threshold, invert, smoothness (how far the curves may stray from the pixels), and the speck size to ignore. Threshold is a single brightness cutoff (0 to 255), so a logo with grey or coloured elements on a dark background needs it lowered (around 60) before everything brighter than the background counts as a cut. Clean line art traces best; JPEG compression noise shows up as ragged edges.
 2. Every **island** (a black piece not connected to the border) is boxed in red and numbered. Islands fall out after cutting. Click **Bridge** to connect one to the body across the shortest gap at the width you set, **Delete** to drop it, or **Bridge all**. Bridges survive threshold changes; **Undo** steps back.
 3. Anything narrower than your kerf is boxed in orange.
 4. Set the width in mm, or pick a panel from the Layout tab and the art is fitted to that panel's safe area.

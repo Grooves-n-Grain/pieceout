@@ -30,6 +30,29 @@ function minDistanceToSegments(p, segments) {
     return best;
 }
 
+function distanceToSegment(p, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2));
+    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+
+/** Worst distance from any sampled point on the fitted curve to the closed input polygon. */
+function maxDistanceToPolygon(segments, polygon) {
+    let worst = 0;
+    for (const seg of segments) {
+        for (let i = 0; i <= 100; i++) {
+            const q = bezierPoint(seg, i / 100);
+            let best = Infinity;
+            for (let k = 0; k < polygon.length; k++) {
+                best = Math.min(best, distanceToSegment(q, polygon[k], polygon[(k + 1) % polygon.length]));
+            }
+            worst = Math.max(worst, best);
+        }
+    }
+    return worst;
+}
+
 test('simplifyPolygon collapses a pixel-edge square to 4 corners', () => {
     const out = simplifyPolygon(unitSquareLoop(5), 0.5);
     assert.deepEqual(out, [[0, 0], [5, 0], [5, 5], [0, 5]]);
@@ -136,4 +159,23 @@ test('simplifyPolygon on 4 collinear points returns 3 distinct points or the ori
     } else {
         assert.deepEqual(out, [[0, 0], [1, 0], [2, 0], [3, 0]], 'otherwise falls back to the original points');
     }
+});
+
+// A 2 px anti-aliasing chamfer at a corner, then a long straight edge. The fitter
+// used to inherit a 45deg tangent from the chamfer and swing ~100 px off the edge
+// while its vertex-only error check reported the fit as within tolerance.
+test('fitBeziers stays within tolerance after a chamfered corner into a long edge', () => {
+    const poly = [[0, 0], [2, 2], [1000, 2], [1000, 200], [0, 200]];
+    const tol = 1.3;
+    const segs = fitBeziers(simplifyPolygon(poly, tol), tol);
+    const worst = maxDistanceToPolygon(segs, poly);
+    assert.ok(worst <= tol + 0.1, `curve strays ${worst.toFixed(1)} px from the polygon`);
+});
+
+test('fitBeziers bounds the bulge on a gentle bend after a long edge', () => {
+    const poly = [[0, 0], [1000, 0], [1020, 30], [1020, 200], [0, 200]];
+    const tol = 1.3;
+    const segs = fitBeziers(simplifyPolygon(poly, tol), tol);
+    const worst = maxDistanceToPolygon(segs, poly);
+    assert.ok(worst <= tol + 0.1, `curve strays ${worst.toFixed(1)} px from the polygon`);
 });

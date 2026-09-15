@@ -3,6 +3,11 @@
  * Automatically Fitting Digitized Curves", Graphics Gems 1990). Corners split
  * the polygon into open chains; each chain is fitted by least squares with
  * Newton reparameterisation and recursive splitting at the worst point.
+ *
+ * Schneider assumes dense digitised samples, but our input is an RDP-simplified
+ * polygon whose straight runs keep no interior vertices at all. A vertex-only
+ * error check therefore says nothing about the curve between vertices, so every
+ * candidate is also sampled and measured against the chain polyline itself.
  */
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
@@ -78,6 +83,47 @@ function generateBezier(d, first, last, u, tHat1, tHat2) {
     return [d[first], add(d[first], scale(tHat1, alphaL)), add(d[last], scale(tHat2, alphaR)), d[last]];
 }
 
+function dist2ToSegment(p, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2));
+    return (p[0] - a[0] - t * dx) ** 2 + (p[1] - a[1] - t * dy) ** 2;
+}
+
+/**
+ * Worst squared distance from the sampled curve to the chain polyline d[first..last],
+ * plus the interior chain vertex nearest that worst sample (-1 when the chain has no
+ * interior vertex). Sampling density follows the control polygon length so a long
+ * segment cannot hide a bulge between samples.
+ */
+function chainDeviation(bez, d, first, last, errorPx) {
+    const ctrlLen = len(sub(bez[1], bez[0])) + len(sub(bez[2], bez[1])) + len(sub(bez[3], bez[2]));
+    const samples = Math.max(16, Math.min(200, Math.ceil(ctrlLen / Math.max(errorPx, 1e-6))));
+    let maxError2 = 0, split = -1;
+    for (let s = 1; s < samples; s++) {
+        const p = bezierPoint(bez, s / samples);
+        let best2 = Infinity, seg = first;
+        for (let i = first; i < last; i++) {
+            const dd = dist2ToSegment(p, d[i], d[i + 1]);
+            if (dd < best2) { best2 = dd; seg = i; }
+        }
+        if (best2 <= maxError2) continue;
+        maxError2 = best2;
+        if (last - first < 2) continue;
+        const nearest = dist2(p, d[seg]) <= dist2(p, d[seg + 1]) ? seg : seg + 1;
+        split = Math.max(first + 1, Math.min(last - 1, nearest));
+    }
+    return { maxError2, split };
+}
+
+/** Combined error: worst of the vertex check and the polyline check, split at whichever is worse. */
+function computeError(d, first, last, bez, u, errorPx) {
+    const atVertices = computeMaxError(d, first, last, bez, u);
+    const alongChain = chainDeviation(bez, d, first, last, errorPx);
+    if (alongChain.maxError2 > atVertices.maxError2 && alongChain.split >= 0) return alongChain;
+    return { maxError2: Math.max(atVertices.maxError2, alongChain.maxError2), split: atVertices.split };
+}
+
 function computeMaxError(d, first, last, bez, u) {
     let maxDist = 0;
     let split = Math.floor((last - first + 1) / 2) + first;
@@ -106,20 +152,28 @@ function reparameterize(d, first, last, u, bez) {
 }
 
 function fitCubic(d, first, last, tHat1, tHat2, error2, out) {
+    const errorPx = Math.sqrt(error2);
     if (last - first === 1) {
-        const dist = Math.sqrt(dist2(d[last], d[first])) / 3;
-        out.push([d[first], add(d[first], scale(tHat1, dist)), add(d[last], scale(tHat2, dist)), d[last]]);
+        // Two points: the tangent cubic is the smooth choice, but the inherited tangents
+        // may point well away from the chord (a pixel chamfer beside a long edge), and
+        // the chord is the only geometry actually known here. Fall back to it if the
+        // tangent curve bulges out of tolerance.
+        const chord = sub(d[last], d[first]);
+        const dist = len(chord) / 3;
+        const bez = [d[first], add(d[first], scale(tHat1, dist)), add(d[last], scale(tHat2, dist)), d[last]];
+        if (chainDeviation(bez, d, first, last, errorPx).maxError2 < error2) { out.push(bez); return; }
+        out.push([d[first], add(d[first], scale(chord, 1 / 3)), add(d[first], scale(chord, 2 / 3)), d[last]]);
         return;
     }
     let u = chordLengthParameterize(d, first, last);
     let bez = generateBezier(d, first, last, u, tHat1, tHat2);
-    let { maxError2, split } = computeMaxError(d, first, last, bez, u);
+    let { maxError2, split } = computeError(d, first, last, bez, u, errorPx);
     if (maxError2 < error2) { out.push(bez); return; }
     if (maxError2 < error2 * 4) {
         for (let i = 0; i < 4; i++) {
             u = reparameterize(d, first, last, u, bez);
             bez = generateBezier(d, first, last, u, tHat1, tHat2);
-            ({ maxError2, split } = computeMaxError(d, first, last, bez, u));
+            ({ maxError2, split } = computeError(d, first, last, bez, u, errorPx));
             if (maxError2 < error2) { out.push(bez); return; }
         }
     }
