@@ -14,6 +14,9 @@ class PatchFusionEngine:
     def __init__(self):
         self.model = None
 
+    def unload(self):
+        self.model = None
+
     def load(self):
         if self.model is not None:
             return

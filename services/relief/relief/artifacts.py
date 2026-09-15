@@ -25,7 +25,17 @@ def shaded_preview(surface, settings):
     return Image.fromarray(np.rint(shade[..., None] * wood).astype(np.uint8))
 
 
-def write_artifacts(output, depth, settings, mask=None, engine='cached-depth'):
+def surface_preview(surface, settings):
+    height, width = surface.shape
+    scale = min(1, 192 / max(height, width))
+    cols, rows = max(2, round(width * scale)), max(2, round(height * scale))
+    preview = np.asarray(Image.fromarray(surface).resize((cols, rows), Image.Resampling.BILINEAR))
+    return {'cols': cols, 'rows': rows, 'width_mm': settings.width_mm,
+            'height_mm': settings.width_mm * height / width, 'depth_mm': settings.depth_mm,
+            'surface': preview.ravel().tolist()}
+
+
+def write_artifacts(output, depth, settings, mask=None, engine='cached-depth', device=None, fallback_reason=None):
     output = Path(output)
     surface, coverage = process_depth(depth, settings, mask)
     output.mkdir(parents=True, exist_ok=True)
@@ -36,8 +46,10 @@ def write_artifacts(output, depth, settings, mask=None, engine='cached-depth'):
     save_gray(output / 'depth_preview.png', 1 - unit_depth(clean_depth(depth), 0, 100))
     shaded_preview(surface, settings).save(output / 'shaded_preview.png')
     height, width = surface.shape
+    (output / 'surface_preview.json').write_text(json.dumps(surface_preview(surface, settings), allow_nan=False))
     metadata = {
-        'schema_version': 1, 'mode': 'recessed', 'engine': engine,
+        'schema_version': 2, 'mode': settings.mode, 'engine': engine,
+        'device': device, 'fallback_reason': fallback_reason,
         'settings': settings.to_dict(), 'pixels': {'width': width, 'height': height},
         'physical': {'width_mm': settings.width_mm, 'height_mm': settings.width_mm * height / width,
                      'z_surface_mm': 0, 'z_min_mm': -settings.depth_mm,

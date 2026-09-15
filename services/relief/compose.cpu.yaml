@@ -1,0 +1,8 @@
+# Use only on hosts without an NVIDIA runtime:
+# docker compose -f compose.yaml -f compose.cpu.yaml up -d --build
+services:
+  relief:
+    deploy:
+      resources:
+        reservations:
+          devices: !reset []

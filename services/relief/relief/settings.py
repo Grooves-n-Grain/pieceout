@@ -13,8 +13,14 @@ class ReliefSettings:
     gamma: float = 1
     contrast: float = 1
     smoothing: float = 1
+    mode: str = 'recessed'
+    depth_model: str = 'patchfusion-vitb'
 
     def __post_init__(self):
+        if self.mode not in ('recessed', 'raised'):
+            raise ValueError('Mode must be recessed or raised.')
+        if self.depth_model not in ('patchfusion-vitb', 'depth-anything-v2-small'):
+            raise ValueError('Choose a supported depth model.')
         bounds = {'width_mm': (0.1, 10000), 'depth_mm': (0.01, 100),
                   'near_percentile': (0, 100), 'far_percentile': (0, 100),
                   'background_threshold': (0.001, 1), 'gamma': (0.25, 4),

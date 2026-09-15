@@ -25,17 +25,17 @@ def main():
     parser.add_argument('--mask', type=Path, help='Matching grayscale image: white allows carving')
     parser.add_argument('--output', type=Path, required=True)
     for name, default in ReliefSettings().to_dict().items():
-        parser.add_argument('--' + name.replace('_', '-'), type=float, default=default)
+        parser.add_argument('--' + name.replace('_', '-'), type=str if isinstance(default, str) else float, default=default)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     try:
         settings = ReliefSettings(**{name: getattr(args, name) for name in ReliefSettings().to_dict()})
         mask_data = read_bounded(args.mask) if args.mask else None
         if args.image:
-            from .engines.patchfusion import PatchFusionEngine
+            from .engines.manager import EngineManager
             image, mask = prepare_image(read_bounded(args.image), mask_data)
-            engine = PatchFusionEngine()
-            depth = engine.predict(image)
+            engine = EngineManager()
+            depth = engine.predict(image, settings.depth_model)
             engine_name = engine.name
         else:
             if args.depth.stat().st_size > 128 * 1024 * 1024:
@@ -46,7 +46,9 @@ def main():
             engine_name = 'cached-depth'
         if (args.output / 'raw_depth.npy').exists():
             raise ValueError('Output already contains depth. Choose a new output directory to preserve it.')
-        metadata = write_artifacts(args.output, depth, settings, mask, engine_name)
+        metadata = write_artifacts(args.output, depth, settings, mask, engine_name,
+                                   engine.device if args.image else None,
+                                   engine.fallback_reason if args.image else None)
         np.save(args.output / 'raw_depth.npy', depth, allow_pickle=False)
         if mask is not None:
             np.save(args.output / 'source_mask.npy', mask, allow_pickle=False)

@@ -177,6 +177,7 @@ function getBackgroundColor() {
 // --- Tabs ---
 
 function setTab(tab) {
+    if (activeTab === 'relief' && tab !== 'relief') relief.hide();
     // Remember the tab we're leaving's own pan/zoom before switching away from it - the
     // canvas and its viewBox are shared by all three tabs, so without this every switch would
     // silently lose whatever view the previous tab had.
@@ -225,9 +226,13 @@ btnPreview.addEventListener('click', () => {
 
 // --- Zoom controls ---
 
-btnZoomIn.addEventListener('click', zoomIn);
-btnZoomOut.addEventListener('click', zoomOut);
-btnZoomFit.addEventListener('click', zoomFit);
+function changeZoom(action) {
+    if (activeTab === 'relief' && relief.zoom(action)) return;
+    ({ in: zoomIn, out: zoomOut, fit: zoomFit })[action]();
+}
+btnZoomIn.addEventListener('click', () => changeZoom('in'));
+btnZoomOut.addEventListener('click', () => changeZoom('out'));
+btnZoomFit.addEventListener('click', () => changeZoom('fit'));
 
 // --- Background toggle ---
 
@@ -326,13 +331,13 @@ document.addEventListener('keydown', (e) => {
             break;
         case '=':
         case '+':
-            zoomIn();
+            changeZoom('in');
             break;
         case '-':
-            zoomOut();
+            changeZoom('out');
             break;
         case '0':
-            zoomFit();
+            changeZoom('fit');
             break;
         case 'v':
             if (activeTab !== 'trace') break;

@@ -16,7 +16,7 @@ from .settings import ReliefSettings
 log = logging.getLogger(__name__)
 ID = re.compile(r'^[a-f0-9]{32}$')
 ARTIFACTS = {'relief_16bit.png', 'relief_preview.png', 'mask_preview.png',
-             'depth_preview.png', 'shaded_preview.png', 'relief_float.npy', 'metadata.json'}
+             'depth_preview.png', 'shaded_preview.png', 'relief_float.npy', 'metadata.json', 'surface_preview.json'}
 SOURCE_FILES = {'source.png', 'raw_depth.npy', 'source_mask.npy'}
 BUSY = {'queued', 'depth_inference', 'relief_processing'}
 
@@ -80,10 +80,10 @@ class Jobs:
             np.save(folder / 'source_mask.npy', mask, allow_pickle=False)
             record = {'id': job_id, 'status': 'queued', 'version': 0, 'engine': self.engine.name,
                       'settings': settings.to_dict(), 'width': image.width, 'height': image.height,
-                      'error': None}
+                      'error': None, 'depth_cache': {}}
             with self.lock:
                 self._save(record)
-            self.executor.submit(self._run, job_id, settings, True)
+            self.executor.submit(self._run, job_id, settings)
             return record
         except Exception:
             self.slots.release()
@@ -100,24 +100,43 @@ class Jobs:
                 raise QueueFull('The relief queue is full. Wait for a job to finish.')
             try:
                 self.update(job_id, status='queued', error=None, settings=settings.to_dict())
-                self.executor.submit(self._run, job_id, settings, False)
+                self.executor.submit(self._run, job_id, settings)
             except Exception:
                 self.slots.release()
                 raise
             return self.get(job_id)
 
-    def _run(self, job_id, settings, inference):
+    def _run(self, job_id, settings):
         folder = self.folder(job_id)
         try:
-            if inference:
+            record = self.get(job_id)
+            cache = record.get('depth_cache', {})
+            if 'depth_cache' not in record and record['has_depth']:
+                cache[record.get('depth_model', 'patchfusion-vitb')] = {
+                    'file': 'raw_depth.npy', 'engine': record['engine'],
+                    'device': record.get('device'), 'fallback_reason': record.get('fallback_reason')}
+                self.update(job_id, depth_cache=cache)
+            info = cache.get(settings.depth_model)
+            if info:
+                depth = np.load(folder / info['file'], allow_pickle=False)
+            else:
                 self.update(job_id, status='depth_inference')
                 with Image.open(folder / 'source.png') as source:
-                    depth = self.engine.predict(source.convert('RGB'))
+                    image = source.convert('RGB')
+                    depth = (self.engine.predict_for(image, settings.depth_model)
+                             if hasattr(self.engine, 'predict_for') else self.engine.predict(image))
                 if depth.shape != (self.get(job_id)['height'], self.get(job_id)['width']):
                     raise ValueError('The engine returned unexpected depth dimensions.')
-                np.save(folder / 'raw_depth.npy', depth, allow_pickle=False)
-            else:
-                depth = np.load(folder / 'raw_depth.npy', allow_pickle=False)
+                # The original inference remains immutable; other models get separate caches.
+                if not (folder / 'raw_depth.npy').exists():
+                    np.save(folder / 'raw_depth.npy', depth, allow_pickle=False)
+                filename = f'depth-{settings.depth_model}.npy'
+                np.save(folder / filename, depth, allow_pickle=False)
+                info = {'file': filename, 'engine': self.engine.name,
+                        'device': getattr(self.engine, 'device', None),
+                        'fallback_reason': getattr(self.engine, 'fallback_reason', None)}
+                cache[settings.depth_model] = info
+                self.update(job_id, depth_cache=cache)
             self.update(job_id, status='relief_processing')
             mask = np.load(folder / 'source_mask.npy', allow_pickle=False)
             # A crash can publish a complete directory before status.json records it.
@@ -125,9 +144,11 @@ class Jobs:
             version = max([self.get(job_id)['version'], *published]) + 1
             # Failed processing can leave this staging directory, but never publishes it.
             staging = folder / ('pending-' + uuid.uuid4().hex)
-            write_artifacts(staging, depth, settings, mask, self.engine.name)
+            write_artifacts(staging, depth, settings, mask, info['engine'], info['device'], info['fallback_reason'])
             staging.replace(folder / str(version))
-            self.update(job_id, status='complete', version=version, error=None)
+            self.update(job_id, status='complete', version=version, error=None,
+                        depth_model=settings.depth_model, engine=info['engine'],
+                        device=info['device'], fallback_reason=info['fallback_reason'])
         except Exception as exc:
             log.exception('Relief job %s failed', job_id)
             if isinstance(exc, ValueError):

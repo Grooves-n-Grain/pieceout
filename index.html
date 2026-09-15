@@ -146,7 +146,7 @@
 
             <aside id="relief-sidebar" class="relief-only">
                 <div class="relief-heading">
-                    <h2>Recessed relief</h2>
+                    <h2>Relief carving</h2>
                     <p>Carve artwork into the face of your material.</p>
                 </div>
                 <div id="relief-form">
@@ -161,10 +161,18 @@
                         <button id="relief-clear-mask" class="small-btn" disabled>Clear mask</button>
                     </details>
                     <form id="relief-settings" onsubmit="return false">
+                        <label class="relief-select" for="relief-mode">Carving style
+                            <select id="relief-mode" name="mode"><option value="recessed">Recessed impression</option><option value="raised">Raised in a pocket</option></select>
+                        </label>
+                        <p id="relief-mode-help" class="relief-help"></p>
+                        <label class="relief-select" for="relief-model">Depth model
+                            <select id="relief-model" name="depth_model"><option value="patchfusion-vitb">PatchFusion · detailed</option><option value="depth-anything-v2-small">Depth Anything V2 · fast</option></select>
+                        </label>
+                        <p id="relief-engine-status" class="relief-help" role="status"></p>
                         <fieldset>
                             <legend>Carving size</legend>
-                            <div class="param-row"><label for="relief-width">Width</label><input id="relief-width" name="width_mm" type="number" min="0.1" max="10000" step="any" value="40" required><span class="unit">mm</span></div>
-                            <div class="param-row"><label for="relief-depth">Maximum depth</label><input id="relief-depth" name="depth_mm" type="number" min="0.01" max="100" step="any" value="3" required><span class="unit">mm</span></div>
+                            <div class="param-row"><label for="relief-width">Width</label><input id="relief-width" name="width_mm" type="number" min="0.1" max="10000" step="any" value="40" data-slider-max="500" required><span class="unit">mm</span></div>
+                            <div class="param-row"><label for="relief-depth">Maximum depth</label><input id="relief-depth" name="depth_mm" type="number" min="0.01" max="100" step="any" value="3" data-slider-max="25" data-slider-step="0.01" required><span class="unit">mm</span></div>
                             <p id="relief-size" class="relief-help">Height follows the image proportions.</p>
                         </fieldset>
                         <fieldset>
@@ -212,11 +220,23 @@
                         <option value="depth">AI depth</option>
                         <option value="shaded" selected>Shaded relief</option>
                         <option value="heightmap">Export heightmap</option>
+                        <option value="3d">3D relief</option>
                     </select>
+                    <span id="relief-preview-note" role="status"></span>
+                </div>
+                <div id="relief-3d" class="relief-only" hidden>
+                    <div class="relief-3d-stage"></div>
+                    <p class="relief-3d-status" role="status"></p>
+                    <div class="relief-3d-tools">
+                        <button type="button" class="small-btn" data-zoom-in aria-label="Zoom in 3D">+</button>
+                        <button type="button" class="small-btn" data-zoom-out aria-label="Zoom out 3D">−</button>
+                        <button type="button" class="small-btn" data-fit>Reset 3D view</button>
+                        <span>Drag to rotate · scroll/pinch to zoom · right-drag/two fingers to pan<br>Surface preview · reduced detail · actual depth proportions</span>
+                    </div>
                 </div>
                 <div id="relief-empty" class="relief-only">
                     <h2>From artwork to carved detail</h2>
-                    <p>Open an image to prepare a recessed relief for Aspire.</p>
+                    <p>Open an image to prepare a relief carving for Aspire.</p>
                     <button id="relief-empty-open" class="toolbar-btn">Choose an image</button>
                 </div>
                 <div id="viewport">

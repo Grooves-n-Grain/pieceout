@@ -3,15 +3,17 @@ import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+import numpy as np
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
-from .engines.patchfusion import PatchFusionEngine
+from .engines.manager import EngineManager
 from .images import MAX_UPLOAD_BYTES, prepare_image, preview_image
 from .jobs import Jobs, JobBusy, QueueFull
 from .settings import ReliefSettings
+from .artifacts import surface_preview
 
 
 class UploadLimit:
@@ -56,7 +58,7 @@ class UploadLimit:
 def create_app(data_dir=None, engine=None):
     @asynccontextmanager
     async def lifespan(app):
-        app.state.jobs = Jobs(data_dir or os.environ.get('RELIEF_DATA_DIR', str(Path.home() / '.local/share/pieceout/relief')), engine or PatchFusionEngine())
+        app.state.jobs = Jobs(data_dir or os.environ.get('RELIEF_DATA_DIR', str(Path.home() / '.local/share/pieceout/relief')), engine or EngineManager())
         yield
         await run_in_threadpool(app.state.jobs.close)
 
@@ -123,7 +125,16 @@ def create_app(data_dir=None, engine=None):
 
     @app.get('/api/relief/jobs/{job_id}/files/{version}/{name}')
     def download(job_id: str, version: int, name: str):
-        path = app.state.jobs.file(job_id, version, name)
+        try:
+            path = app.state.jobs.file(job_id, version, name)
+        except FileNotFoundError:
+            if name != 'surface_preview.json':
+                raise
+            # Older immutable versions already contain float geometry and settings.
+            surface = np.load(app.state.jobs.file(job_id, version, 'relief_float.npy'), allow_pickle=False)
+            metadata = json.loads(app.state.jobs.file(job_id, version, 'metadata.json').read_text())
+            return JSONResponse(surface_preview(surface, ReliefSettings(**metadata['settings'])),
+                                headers={'Cache-Control': 'private, max-age=31536000, immutable'})
         return FileResponse(path, headers={'Cache-Control': 'private, max-age=31536000, immutable'})
 
     return app

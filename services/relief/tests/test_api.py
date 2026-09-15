@@ -71,6 +71,85 @@ class APITests(unittest.TestCase):
         for job in jobs: self.wait(job)
         self.assertEqual(self.engine.calls, 3)
         self.assertEqual(self.engine.peak_active, 1)
+
+    def test_mode_and_model_switches_reuse_the_correct_cached_depth(self):
+        job = self.create()
+        self.wait(job)
+        original = self.client.get(f'/api/relief/jobs/{job}/files/0/raw_depth.npy').content
+        for controls, expected_calls in [({'mode': 'raised'}, 1),
+                                         ({'depth_model': 'depth-anything-v2-small'}, 2),
+                                         ({'depth_model': 'patchfusion-vitb'}, 2),
+                                         ({'depth_model': 'depth-anything-v2-small'}, 2)]:
+            response = self.client.post(f'/api/relief/jobs/{job}/relief', json=controls)
+            self.assertEqual(response.status_code, 202, response.text)
+            record = self.wait(job)
+            self.assertEqual(self.engine.calls, expected_calls)
+            self.assertEqual(record['settings']['mode'], 'raised')
+            self.assertEqual(record['depth_model'], record['settings']['depth_model'])
+            preview = self.client.get(f"/api/relief/jobs/{job}/files/{record['version']}/surface_preview.json")
+            self.assertEqual(preview.status_code, 200)
+            self.assertEqual(len(preview.json()['surface']), 24 * 36)
+        self.assertEqual(original, self.client.get(f'/api/relief/jobs/{job}/files/0/raw_depth.npy').content)
+
+    def test_legacy_version_has_3d_preview_without_reprocessing(self):
+        job = self.create()
+        self.wait(job)
+        (Path(self.temp.name) / job / '1/surface_preview.json').unlink()
+        response = self.client.get(f'/api/relief/jobs/{job}/files/1/surface_preview.json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.engine.calls, 1)
+        self.assertEqual(self.client.get(f'/api/relief/jobs/{job}/files/2/surface_preview.json').status_code, 404)
+
+    def test_cached_exports_keep_original_engine_provenance(self):
+        job = self.create()
+        self.wait(job)
+        self.engine.name = 'another-resident-model'
+        self.client.post(f'/api/relief/jobs/{job}/relief', json={'mode': 'raised'})
+        record = self.wait(job)
+        self.assertEqual(record['engine'], 'test-only')
+        metadata = self.client.get(f"/api/relief/jobs/{job}/files/{record['version']}/metadata.json").json()
+        self.assertEqual(metadata['engine'], 'test-only')
+
+    def test_model_switch_after_first_processing_failure_runs_requested_model(self):
+        import json
+        calls = []
+        def predict_for(image, model):
+            calls.append(model)
+            self.engine.name = model
+            return self.engine.predict(image)
+        self.engine.predict_for = predict_for
+        response = self.client.post('/api/relief/jobs',
+            files={'image': ('small.png', source_bytes((5, 5)), 'image/png')},
+            data={'settings': json.dumps({'depth_model': 'depth-anything-v2-small', 'background_threshold': 0.001})})
+        self.assertEqual(response.status_code, 202, response.text)
+        job = response.json()['id']
+        for _ in range(200):
+            record = self.client.get(f'/api/relief/jobs/{job}').json()
+            if record['status'] == 'error': break
+            time.sleep(0.01)
+        self.assertEqual(record['status'], 'error')
+        response = self.client.post(f'/api/relief/jobs/{job}/relief',
+                                   json={'depth_model': 'patchfusion-vitb', 'background_threshold': 1})
+        self.assertEqual(response.status_code, 202, response.text)
+        record = self.wait(job)
+        self.assertEqual(calls, ['depth-anything-v2-small', 'patchfusion-vitb'])
+        self.assertEqual(record['engine'], 'patchfusion-vitb')
+
+    def test_legacy_depth_is_cached_before_switching_models(self):
+        import json
+        job = self.create()
+        self.wait(job)
+        path = Path(self.temp.name) / job / 'status.json'
+        record = json.loads(path.read_text())
+        record.pop('depth_cache')
+        record.pop('depth_model')
+        record['settings'].pop('depth_model')
+        record['settings'].pop('mode')
+        path.write_text(json.dumps(record))
+        for model in ['depth-anything-v2-small', 'patchfusion-vitb']:
+            self.client.post(f'/api/relief/jobs/{job}/relief', json={'depth_model': model})
+            self.wait(job)
+        self.assertEqual(self.engine.calls, 2)
     def test_upload_validation(self):
         response = self.client.post('/api/relief/jobs', files={'image': ('fake.png', b'not an image', 'image/png')})
         self.assertEqual(response.status_code, 422)

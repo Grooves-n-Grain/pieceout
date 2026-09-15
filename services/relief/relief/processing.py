@@ -50,5 +50,7 @@ def process_depth(depth, settings: ReliefSettings, mask=None):
         numerator = gaussian_filter(strength * coverage, settings.smoothing)
         denominator = gaussian_filter(coverage, settings.smoothing)
         strength = np.divide(numerator, denominator, out=np.zeros_like(numerator), where=denominator > 1e-8)
-    surface = 1 - np.clip(strength, 0, 1) * coverage
+    strength = np.clip(strength, 0, 1)
+    removal = 1 - strength if settings.mode == 'raised' else strength
+    surface = 1 - removal * coverage
     return surface.astype(np.float32), coverage

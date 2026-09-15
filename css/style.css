@@ -881,3 +881,16 @@ body.mode-relief #drop-zone { display: none !important; }
 
 .relief-slider output { margin-left: auto; min-width: 28px; color: var(--text-secondary); text-align: right; font-variant-numeric: tabular-nums; }
 .relief-slider input { width: 90px; flex-shrink: 0; }
+.relief-number-slider { grid-template-columns: minmax(0, 1fr) 48px 18px 90px; gap: 4px; margin: 12px 0; padding: 0; }
+.relief-number-slider input[type="range"] { width: 90px; margin: 0; accent-color: var(--wood-color); }
+.relief-select { display: flex; flex-direction: column; gap: 6px; font-size: 12px; margin: 12px 0 6px; }
+.relief-select select { width: 100%; padding: 6px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 3px; }
+#relief-preview-controls { flex-wrap: wrap; max-width: calc(100% - 32px); }
+#relief-preview-note { color: var(--text-secondary); font-size: 11px; }
+#relief-3d { position: absolute; inset: 0; z-index: 1; background: var(--bg-primary); }
+#relief-3d[hidden] { display: none; }
+.relief-3d-stage { position: absolute; inset: 0; }
+.relief-3d-stage canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.relief-3d-status { position: absolute; top: 70px; left: 20px; right: 20px; text-align: center; font-size: 13px; pointer-events: none; }
+.relief-3d-tools { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.relief-3d-tools span { font-size: 11px; color: var(--text-secondary); }

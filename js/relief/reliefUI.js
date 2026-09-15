@@ -1,12 +1,14 @@
 /** Relief controller: saved jobs, settings and raster previews on the shared viewport. */
 import * as api from './api.js';
 import { loadImagePreview } from './imagePreview.js';
+import { initNumberSliders } from './numberSliders.js';
+import { initSurfacePreview } from './surfacePreview.js';
 import { setInitialView } from '../viewport.js';
 
 const STORE = 'pieceout-relief-job';
 const BUSY = new Set(['queued', 'depth_inference', 'relief_processing']);
 const STAGES = { queued: 'Waiting for the relief worker…', depth_inference: 'Generating depth… The first run also loads the model.',
-    relief_processing: 'Preparing your recessed relief…', complete: 'Relief ready. Check the carving area, then export for Aspire.' };
+    relief_processing: 'Preparing your relief…', complete: 'Relief ready. Check the carving area, then export for Aspire.' };
 const VIEWS = { depth: 'depth_preview.png', mask: 'mask_preview.png', shaded: 'shaded_preview.png', heightmap: 'relief_preview.png' };
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -19,7 +21,9 @@ export function initRelief({ canvas, isActive }) {
     const generate = $('relief-generate');
     const reconnect = $('relief-reconnect');
     const view = $('relief-view');
-    const controls = [...form.querySelectorAll('input')];
+    const controls = [...form.querySelectorAll('input, select')];
+    const preview3D = initSurfacePreview($('relief-3d'));
+    const updateNumberSliders = initNumberSliders(form);
     const downloads = [$('relief-download'), $('relief-metadata')];
     const readings = controls.filter(input => input.type === 'range').map(input => {
         const output = document.createElement('output');
@@ -35,7 +39,7 @@ export function initRelief({ canvas, isActive }) {
     function remember(id) { try { if (id) localStorage.setItem(STORE, id); else localStorage.removeItem(STORE); } catch {} }
     function saved() { try { return localStorage.getItem(STORE); } catch { return null; } }
     function message(text, error = false) { status.textContent = text; status.classList.toggle('error', error); }
-    function settings() { return Object.fromEntries(controls.map(input => [input.name, Number(input.value)])); }
+    function settings() { return Object.fromEntries(controls.map(input => [input.name, input.tagName === 'SELECT' ? input.value : Number(input.value)])); }
     function fillSettings(values) { controls.forEach(input => { if (values[input.name] !== undefined) input.value = values[input.name]; }); }
     function valid() {
         if (!form.reportValidity()) return false;
@@ -47,6 +51,15 @@ export function initRelief({ canvas, isActive }) {
         readings.forEach(([input, output]) => { output.value = input.value; });
         generate.disabled = !source || !connected || busy;
         controls.forEach(input => { input.disabled = busy; });
+        updateNumberSliders();
+        const raised = $('relief-mode').value === 'raised';
+        $('relief-mode-help').textContent = raised
+            ? 'Near features stay high above a carved pocket. Protected areas stay at the stock face. Increase Background limit to include more surrounding material in the pocket.'
+            : 'Near features become deeper impressions. Protected areas stay at the stock face.';
+        $('relief-engine-status').textContent = job?.fallback_reason || (job?.device
+            ? `${job.engine === 'patchfusion-vitb' ? 'PatchFusion' : 'Depth Anything V2 Small'} · ${job.device === 'cuda' ? 'GPU' : 'CPU'}`
+            : 'GPU preferred · CPU fallback if CUDA is unavailable or memory is insufficient.');
+        $('relief-preview-note').textContent = dirty || busy ? 'Showing the last completed relief while settings update.' : '';
         maskInput.disabled = busy || !source;
         $('relief-clear-mask').disabled = busy || !mask;
         reconnect.hidden = connected;
@@ -64,6 +77,11 @@ export function initRelief({ canvas, isActive }) {
     function render() {
         updateControls();
         if (!isActive()) return;
+        if (view.value === '3d' && job?.version) {
+            preview3D.show(api.fileURL(job.id, job.version, 'surface_preview.json'), job.id);
+            return;
+        }
+        preview3D.hide();
         let url = sourceURL;
         if (job) {
             url = api.fileURL(job.id, 0, 'source.png');
@@ -120,7 +138,7 @@ export function initRelief({ canvas, isActive }) {
                 } catch { remember(null); }
             }
             if (job) { clearTimeout(polling); await poll(token); }
-            else message('Open an image to make a recessed carving.');
+            else message('Open an image to make a relief carving.');
         } catch (error) {
             if (token === epoch) { connected = false; message(error.message, true); }
         } finally { checking = false; updateControls(); }
@@ -163,7 +181,9 @@ export function initRelief({ canvas, isActive }) {
         if (!job?.has_depth || busy || !valid()) return;
         if (maskDirty) { message('Generate depth to apply the selected carving mask.'); return; }
         const token = epoch;
-        busy = true; updateControls(); message('Updating relief from saved depth…');
+        busy = true; updateControls();
+        message(settings().depth_model !== (job.depth_model || 'patchfusion-vitb')
+            ? 'Switching depth model… Cached results are reused when available.' : 'Updating relief from saved depth…');
         try {
             const next = await api.reprocess(job.id, settings());
             if (token !== epoch) return;
@@ -192,5 +212,11 @@ export function initRelief({ canvas, isActive }) {
     });
     $('relief-clear-mask').addEventListener('click', () => { mask = null; maskInput.value = ''; maskDirty = true; dirty = Boolean(job); message('Mask removed. Generate depth to update the carving area.'); updateControls(); });
     view.addEventListener('change', render);
-    return { loadFile, show() { needsFit = true; render(); if (!connected && !checking) connect(); } };
+    return { loadFile, hide() { preview3D.hide(); },
+        zoom(action) {
+            if (view.value !== '3d' || !job?.version) return false;
+            preview3D.zoom(action);
+            return true;
+        },
+        show() { needsFit = true; render(); if (!connected && !checking) connect(); } };
 }
