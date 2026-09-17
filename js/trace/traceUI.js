@@ -20,32 +20,13 @@ import { injectSVG, showPreview } from '../renderer.js';
 import { createLayerState } from '../layerTagger.js';
 import { setInitialView, refreshViewBox } from '../viewport.js';
 import { fmt } from '../layout/svgWriter.js';
+import { IMAGE_PARAMS, CHECK_PARAMS, SIZE_PARAMS, defaults } from './params.js';
+import { getUnits, onUnitsChange, formatArea, formatDisplay, displayUnit } from '../units.js';
 
 const MAX_SIDE = 4000;
 const DEBOUNCE_MS = 80;
 
-const IMAGE_PARAMS = [
-    { key: 'threshold', label: 'Threshold', default: 128, min: 1, max: 254, step: 1, unit: '', integer: true },
-    { key: 'invert', label: 'Art is white on black', default: false, type: 'boolean' },
-    { key: 'smoothness', label: 'Smoothness', default: 40, min: 0, max: 100, step: 5, unit: '%', integer: true },
-    { key: 'minSpeck', label: 'Min speck size', default: 12, min: 0, max: 200, step: 1, unit: 'px', integer: true },
-];
-const CHECK_PARAMS = [
-    { key: 'kerfMm', label: 'Kerf / bit', default: 0.1, min: 0, max: 10, step: 0.05, unit: 'mm' },
-    { key: 'bridgeMm', label: 'Bridge width', default: 0.8, min: 0.2, max: 10, step: 0.1, unit: 'mm' },
-    { key: 'minIslandMm2', label: 'Delete islands under', default: 0, min: 0, max: 10000, step: 0.5, unit: 'mm2' },
-];
-const SIZE_PARAMS = [
-    { key: 'widthMm', label: 'Width', default: 100, min: 5, max: 2000, step: 1, unit: 'mm' },
-    { key: 'includeOutline', label: 'Include outline', default: true, type: 'boolean' },
-];
-const ALL_PARAMS = [...IMAGE_PARAMS, ...CHECK_PARAMS, ...SIZE_PARAMS];
-
-function defaults() {
-    return Object.fromEntries(ALL_PARAMS.map(p => [p.key, p.default]));
-}
-
-export function initTrace({ canvas, getPanels, onSendToPreview, getBackground }) {
+export function initTrace({ canvas, getPanels, onSendToPreview, getBackground, onImageLoaded }) {
     const $ = (id) => document.getElementById(id);
     const imageList = $('group-trace-image').querySelector('.param-list');
     const checkList = $('group-trace-checks').querySelector('.param-list');
@@ -59,6 +40,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     const btnOpen = $('btn-trace-open');
     const btnBridgeAll = $('btn-bridge-all');
     const btnDeleteAll = $('btn-delete-all');
+    const btnKeepAll = $('btn-keep-all');
     const btnUndo = $('btn-trace-undo');
     const btnVector = $('btn-trace-vector');
     const btnExport = $('btn-trace-export');
@@ -172,8 +154,10 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
 
     function renderSidebar() {
         const r = state.result;
+        const units = getUnits();
         renderIslandList(islandsEl, islandCountEl, r ? r.islands : [], state.scale, {
             selected: state.selected,
+            units,
             onSelect: (island, { toggle } = {}) => {
                 if (toggle) toggleIslandSelection(island.number, 'row');
                 else selectIsland(island.number, 'row');
@@ -215,6 +199,11 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         const ready = Boolean(r);
         btnExport.disabled = btnSend.disabled = btnVector.disabled = !ready;
         btnBridgeAll.disabled = btnDeleteAll.disabled = !ready || !bulkTargets(r.islands).length;
+        // Keep all mirrors the group popover's Keep/Unkeep: it keeps everything until every
+        // island is already kept, and only then offers to clear them all again.
+        const allKept = ready && r.islands.length > 0 && !bulkTargets(r.islands).length;
+        btnKeepAll.disabled = !ready || !r.islands.length;
+        btnKeepAll.textContent = allKept ? 'Unkeep all' : 'Keep all';
         btnUndo.disabled = !state.ops.length;
     }
 
@@ -344,6 +333,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         };
         renderIslandPopover(popoverEl, { ...island, mm2 }, {
             bridgeMm: state.params.bridgeMm,
+            units: getUnits(),
             kept: Boolean(island.kept),
             // Bridge regenerates straight away, which resets regenerateMessages, so its clamp
             // warning rides along with the op instead of being pushed (and wiped) up front.
@@ -367,6 +357,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         const anyNotKept = islands.some((isl) => !isl.kept);
         renderIslandPopover(popoverEl, { islands, mm2 }, {
             bridgeMm: state.params.bridgeMm,
+            units: getUnits(),
             kept: !anyNotKept,
             onBridge: (widthMm) => bridgeSelected(islands, widthMm),
             onDelete: () => deleteSelected(islands),
@@ -417,7 +408,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     }
 
     function setBusyButtons(disabled) {
-        for (const btn of [btnBridgeAll, btnDeleteAll, btnUndo, btnVector, btnExport, btnSend, ...islandsEl.querySelectorAll('button')]) {
+        for (const btn of [btnBridgeAll, btnDeleteAll, btnKeepAll, btnUndo, btnVector, btnExport, btnSend, ...islandsEl.querySelectorAll('button')]) {
             btn.disabled = disabled;
         }
     }
@@ -460,7 +451,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             if (sized.removed > 0) {
                 state.regenerateMessages.push({
                     level: 'info', field: 'islands',
-                    message: `${sized.removed} island${sized.removed === 1 ? '' : 's'} under ${state.params.minIslandMm2} mm2 removed by the size rule.`,
+                    message: `${sized.removed} island${sized.removed === 1 ? '' : 's'} under ${formatArea(state.params.minIslandMm2, getUnits())} removed by the size rule.`,
                 });
             }
             state.result = tracePipeline(state.edited, { tolerancePx, kerfPx, minSpeckPx: state.params.minSpeck });
@@ -726,24 +717,32 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
     }
 
     function renderSizeGroup() {
-        renderParamInputs(sizeList, SIZE_PARAMS, state.params, onParamChange);
+        renderParamInputs(sizeList, SIZE_PARAMS, state.params, onParamChange, { units: getUnits() });
         const widthInput = document.getElementById('param-widthMm');
         if (widthInput) widthInput.disabled = Boolean(state.panelName);
     }
 
     function renderForm() {
-        renderParamInputs(imageList, IMAGE_PARAMS, state.params, onParamChange);
-        renderParamInputs(checkList, CHECK_PARAMS, state.params, onParamChange);
+        const units = getUnits();
+        renderParamInputs(imageList, IMAGE_PARAMS, state.params, onParamChange, { units });
+        renderParamInputs(checkList, CHECK_PARAMS, state.params, onParamChange, { units });
         renderSizeGroup();
+    }
+
+    // fmt() (mm, rounded to 3 decimals) is kept for the mm case so this reads exactly as it
+    // always has; inches use formatDisplay for the same 3-decimal, trimmed rounding.
+    function panelSizeText(mm, units) {
+        return units === 'in' ? formatDisplay(mm, 'mm', units) : fmt(mm);
     }
 
     function refreshPanelSelect() {
         const panels = getPanels();
+        const units = getUnits();
         panelSelect.innerHTML = '<option value="">None</option>';
         for (const p of panels) {
             const opt = document.createElement('option');
             opt.value = p.name;
-            opt.textContent = `${p.name} (${fmt(p.safeArea.width)} x ${fmt(p.safeArea.height)} mm)`;
+            opt.textContent = `${p.name} (${panelSizeText(p.safeArea.width, units)} x ${panelSizeText(p.safeArea.height, units)} ${displayUnit('mm', units)})`;
             panelSelect.appendChild(opt);
         }
         let changed = false;
@@ -802,6 +801,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         state.view = 'raster';
         regenerate();
         setInitialView({ x: 0, y: 0, width, height });
+        onImageLoaded?.();
     }
 
     btnOpen.addEventListener('click', () => fileInput.click());
@@ -828,6 +828,11 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
         state.selected = new Set();
         regenerate();
     });
+    btnKeepAll.addEventListener('click', () => {
+        if (!state.result) return;
+        const islands = state.result.islands;
+        keepSelected(islands, bulkTargets(islands).length > 0);
+    });
     btnUndo.addEventListener('click', () => { state.ops.pop(); regenerate(); });
     btnVector.addEventListener('click', () => toggleView());
     btnExport.addEventListener('click', () => {
@@ -845,6 +850,15 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
 
     renderForm();
     renderSidebar();
+
+    // State stays mm throughout; a units change only needs to re-render what's already
+    // computed in the new display units, not recompute anything.
+    onUnitsChange(() => {
+        renderForm();
+        refreshPanelSelect();
+        renderSidebar();
+        syncPopover();
+    });
 
     return {
         show() {
@@ -865,6 +879,7 @@ export function initTrace({ canvas, getPanels, onSendToPreview, getBackground })
             else { canvas.innerHTML = ''; renderSidebar(); }
         },
         loadFile,
+        hasImage: () => Boolean(state.imageData),
         toggleView,
         clearSelection() {
             let changed = false;

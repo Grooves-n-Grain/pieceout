@@ -1,12 +1,8 @@
 // js/trace/traceSidebar.js
 /** Island list and stats rendering for the Trace sidebar. Pure DOM building, no state. */
+import { formatArea } from '../units.js';
 
-// Shared with islandPopover.js so both places format an island's area the same way.
-export function formatMm2(mm2) {
-    return mm2 < 10 ? mm2.toFixed(1) : Math.round(mm2);
-}
-
-export function renderIslandList(container, countEl, islands, scaleMmPerPx, { selected, onSelect, onBridge, onDelete, onKeep }) {
+export function renderIslandList(container, countEl, islands, scaleMmPerPx, { selected, onSelect, onBridge, onDelete, onKeep, units = 'mm' }) {
     container.innerHTML = '';
     countEl.textContent = String(islands.length);
     if (!islands.length) {
@@ -27,7 +23,7 @@ export function renderIslandList(container, countEl, islands, scaleMmPerPx, { se
         const keepTitle = island.kept ? 'Stop keeping this island' : 'Keep this island as a separate piece';
         row.innerHTML = `
             <span class="island-index">${island.number}</span>
-            <span class="island-area">${formatMm2(mm2)} mm2</span>
+            <span class="island-area">${formatArea(mm2, units)}</span>
             <button class="small-btn" data-action="bridge" title="Bridge to the body">Bridge</button>
             <button class="small-btn" data-action="delete" title="Remove this island">Delete</button>
             <button class="small-btn" data-action="keep" title="${keepTitle}">${keepLabel}</button>

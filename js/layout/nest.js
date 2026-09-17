@@ -5,6 +5,7 @@
  */
 import { Grain, Material } from './parts.js';
 import { sheetSize } from './machine.js';
+import { formatDisplay, displayUnit } from '../units.js';
 
 export class NestError extends Error {
     constructor(message, partName) {
@@ -58,7 +59,7 @@ function byHeightThenWidth(a, b) {
     return b.height - a.height || b.width - a.width || a.name.localeCompare(b.name);
 }
 
-function packMaterial(material, copies, machine) {
+function packMaterial(material, copies, machine, units) {
     const { width: sheetW, height: sheetH } = sheetSize(machine, material);
     const { gutter, edgeMargin } = machine;
     const usableW = sheetW - 2 * edgeMargin;
@@ -92,7 +93,8 @@ function packMaterial(material, copies, machine) {
         if (!fitsUsable(part)) {
             const alt = part.grain === Grain.ANY ? rotatePart(part) : null;
             if (!alt || !fitsUsable(alt)) {
-                throw new NestError(`"${part.name}" (${part.width} x ${part.height} mm) does not fit on the ${material} sheet inside the margins.`, part.name);
+                const size = `${formatDisplay(part.width, 'mm', units)} x ${formatDisplay(part.height, 'mm', units)} ${displayUnit('mm', units)}`;
+                throw new NestError(`"${part.name}" (${size}) does not fit on the ${material} sheet inside the margins.`, part.name);
             }
             part = alt;
             rotated = true;
@@ -124,12 +126,12 @@ function packMaterial(material, copies, machine) {
     return sheets;
 }
 
-export function nest(parts, machine) {
+export function nest(parts, machine, { units = 'mm' } = {}) {
     const copies = expandCopies(parts);
     const sheets = [];
     for (const material of Object.values(Material)) {
         const group = copies.filter(c => c.material === material);
-        if (group.length) sheets.push(...packMaterial(material, group, machine));
+        if (group.length) sheets.push(...packMaterial(material, group, machine, units));
     }
     return sheets;
 }

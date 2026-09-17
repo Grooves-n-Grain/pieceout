@@ -7,14 +7,14 @@
     <text x="34.5" y="47.5" font-size="3" font-family="sans-serif" fill="#888888" stroke="none">2</text>
     <circle cx="62.5" cy="17.5" r="1.5"/>
     <text x="64.5" y="17.5" font-size="3" font-family="sans-serif" fill="#888888" stroke="none">3</text>
-    <rect x="20" y="10" width="30" height="20" stroke="#f5a623"/>
-    <rect x="10" y="0" width="60" height="5" stroke="#f5a623"/>
-    <rect x="10" y="65" width="60" height="5" stroke="#f5a623"/>
-    <rect x="0" y="10" width="5" height="50" stroke="#f5a623"/>
-    <rect x="75" y="10" width="5" height="50" stroke="#f5a623"/>
-    <rect x="30" y="35" width="5" height="25" stroke="#f5a623"/>
+    <rect x="20" y="10" width="30" height="20" stroke="#f2c94c"/>
+    <rect x="10" y="0" width="60" height="5" stroke="#f2c94c"/>
+    <rect x="10" y="65" width="60" height="5" stroke="#f2c94c"/>
+    <rect x="0" y="10" width="5" height="50" stroke="#f2c94c"/>
+    <rect x="75" y="10" width="5" height="50" stroke="#f2c94c"/>
+    <rect x="30" y="35" width="5" height="25" stroke="#f2c94c"/>
   </g>
-  <g id="CUT" inkscape:label="CUT" inkscape:groupmode="layer" fill="none" stroke="#e94560" stroke-width="0.3">
+  <g id="CUT" inkscape:label="CUT" inkscape:groupmode="layer" fill="none" stroke="#d9622b" stroke-width="0.3">
     <path fill-rule="evenodd" d="M 5 5 C 28.333 5 51.667 5 75 5 C 75 25 75 45 75 65 C 51.667 65 28.333 65 5 65 C 5 45 5 25 5 5 Z M 20 10 C 20 16.667 20 23.333 20 30 C 30 30 40 30 50 30 C 50 23.333 50 16.667 50 10 C 40 10 30 10 20 10 Z M 65 15 C 63.333 15 61.667 15 60 15 C 60 16.667 60 18.333 60 20 C 61.667 20 63.333 20 65 20 C 65 18.333 65 16.667 65 15 Z M 35 35 C 33.333 35 31.667 35 30 35 C 30 43.333 30 51.667 30 60 C 31.667 60 33.333 60 35 60 C 35 51.667 35 43.333 35 35 Z"/>
     <path fill-rule="evenodd" d="M 25 15 C 31.667 15 38.333 15 45 15 C 45 18.333 45 21.667 45 25 C 38.333 25 31.667 25 25 25 C 25 21.667 25 18.333 25 15 Z"/>
   </g>

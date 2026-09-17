@@ -18,6 +18,7 @@ import {
 import { initLayout } from './layout/layoutUI.js';
 import { initTrace } from './trace/traceUI.js';
 import { initRelief } from './relief/reliefUI.js';
+import { loadUnits, saveUnits, getUnits, setUnits, onUnitsChange } from './units.js';
 
 // --- State ---
 let parsedSVG = null;
@@ -27,6 +28,9 @@ let currentView = 'wireframe'; // 'wireframe' | 'preview'
 // --- DOM refs ---
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
+const traceFileInput = document.getElementById('trace-file-input');
+const dropZoneTitle = document.getElementById('drop-zone-title');
+const dropZoneSub = document.getElementById('drop-zone-sub');
 const canvas = document.getElementById('svg-canvas');
 const viewport = document.getElementById('viewport');
 const layerListEl = document.getElementById('layer-list');
@@ -53,7 +57,26 @@ const btnClearTags = document.getElementById('btn-clear-tags');
 
 // --- File drop handling ---
 
-dropZone.addEventListener('click', () => fileInput.click());
+// The drop zone is shared by the two import tabs: it shows whenever the active tab has
+// nothing loaded yet, with that tab's own wording, and routes a click to that tab's picker.
+const DROP_ZONE_COPY = {
+    preview: { title: 'Drop SVG file here', sub: 'or click to browse' },
+    trace: { title: 'Drop an image here', sub: 'PNG, JPG or WebP, or click to browse' },
+};
+
+function updateDropZone() {
+    const copy = DROP_ZONE_COPY[activeTab];
+    const empty = activeTab === 'preview' ? !parsedSVG
+        : activeTab === 'trace' ? !trace.hasImage()
+        : false;
+    if (copy) {
+        dropZoneTitle.textContent = copy.title;
+        dropZoneSub.textContent = copy.sub;
+    }
+    dropZone.classList.toggle('visible', Boolean(copy) && empty);
+}
+
+dropZone.addEventListener('click', () => (activeTab === 'trace' ? traceFileInput : fileInput).click());
 fileInput.addEventListener('change', (e) => {
     if (e.target.files[0]) loadFile(e.target.files[0]);
 });
@@ -63,21 +86,17 @@ const container = document.getElementById('viewport-container');
 
 container.addEventListener('dragover', (e) => {
     e.preventDefault();
-    if (activeTab !== 'preview') return;
+    if (!DROP_ZONE_COPY[activeTab]) return;
     e.stopPropagation();
     dropZone.classList.add('drag-over');
-    if (!dropZone.classList.contains('visible')) {
-        dropZone.classList.add('visible');
-    }
+    dropZone.classList.add('visible');
 });
 
 container.addEventListener('dragleave', (e) => {
     e.preventDefault();
-    if (activeTab !== 'preview') return;
+    if (!DROP_ZONE_COPY[activeTab]) return;
     dropZone.classList.remove('drag-over');
-    if (parsedSVG) {
-        dropZone.classList.remove('visible');
-    }
+    updateDropZone();
 });
 
 container.addEventListener('drop', (e) => {
@@ -92,6 +111,7 @@ container.addEventListener('drop', (e) => {
     }
     if (activeTab === 'trace') {
         if (file) trace.loadFile(file);
+        updateDropZone(); // hides again once the image lands, via onImageLoaded
         return;
     }
     if (activeTab === 'layout') return;
@@ -121,8 +141,7 @@ function loadSVGContent(svgText) {
     // first: mutate the viewport only while the owning tab is active.
     parsedSVG = parseSVG(svgText);
 
-    // Hide drop zone
-    dropZone.classList.remove('visible');
+    updateDropZone();
 
     // Inject SVG into canvas
     injectSVG(parsedSVG, canvas);
@@ -167,10 +186,10 @@ function applyView() {
 function getBackgroundColor() {
     const bg = bgSelect.value;
     switch (bg) {
-        case 'dark': return '#1a1a2e';
+        case 'dark': return '#1c1c1e';
         case 'light': return '#f0f0f0';
         case 'checkerboard': return '#1a1a1a';
-        default: return '#1a1a2e';
+        default: return '#1c1c1e';
     }
 }
 
@@ -197,7 +216,6 @@ function setTab(tab) {
             applyView();
         } else {
             canvas.innerHTML = '';
-            dropZone.classList.add('visible');
         }
     } else if (tab === 'layout') {
         layout.show();
@@ -206,6 +224,7 @@ function setTab(tab) {
     } else {
         trace.show();
     }
+    updateDropZone();
 
     // Restore this tab's own view over whatever it just fitted to on entry (a first-ever
     // visit has nothing saved yet, so its own fit stands).
@@ -350,6 +369,25 @@ document.addEventListener('keydown', (e) => {
 
 initViewport(canvas);
 
+// --- Units toggle (mm / in) ---
+// Loaded and applied before the tabs initialise, so their first render already reflects a
+// saved preference instead of flashing mm and then jumping to inches.
+setUnits(loadUnits());
+const unitsToggleEl = document.getElementById('units-toggle');
+if (unitsToggleEl) {
+    const unitsButtons = [...unitsToggleEl.querySelectorAll('button')];
+    const syncUnitsButtons = () => {
+        const units = getUnits();
+        unitsButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.units === units));
+    };
+    unitsButtons.forEach(btn => btn.addEventListener('click', () => {
+        setUnits(btn.dataset.units);
+        saveUnits(getUnits());
+    }));
+    onUnitsChange(syncUnitsButtons);
+    syncUnitsButtons();
+}
+
 // Switch tabs first: loadSVGContent mutates the shared viewport, and it must do so while
 // Preview is already the active tab (see the comment on loadSVGContent).
 function sendToPreview(svgText) {
@@ -367,6 +405,7 @@ const trace = initTrace({
     getPanels: () => layout.getPanels(),
     onSendToPreview: sendToPreview,
     getBackground: getBackgroundColor,
+    onImageLoaded: updateDropZone,
 });
 
 const relief = initRelief({ canvas, isActive: () => activeTab === 'relief' });

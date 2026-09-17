@@ -5,7 +5,7 @@
  */
 import { Layer } from './parts.js';
 
-const COLORS = { CUT: '#e94560', POCKET: '#4a9eff', DRILL: '#f5a623', GUIDE: '#888888' };
+const COLORS = { CUT: '#d9622b', POCKET: '#4a9eff', DRILL: '#f2c94c', GUIDE: '#888888' };
 const STROKE_WIDTH = 0.3;
 const LABEL_FONT_SIZE = 4;
 

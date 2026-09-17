@@ -4,12 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PieceOut - CNC Cut Preview</title>
+    <meta name="theme-color" content="#1c1c1e">
+    <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="manifest" href="assets/icons/manifest.webmanifest">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="mode-preview">
     <div id="app">
         <header>
-            <h1>PieceOut</h1>
+            <h1>PieceOut <span id="app-version" title="Version">v1.3</span></h1>
             <nav id="tabs">
                 <button id="tab-preview" class="tab-btn active" data-tab="preview">Preview</button>
                 <button id="tab-layout" class="tab-btn" data-tab="layout">Layout</button>
@@ -47,6 +52,10 @@
                     <span class="separator"></span>
                 </span>
                 <button id="btn-legend" class="toolbar-btn" title="Legend">?</button>
+                <span id="units-toggle" class="units-toggle" title="Show sizes in millimetres or decimal inches. Exported SVG files are always millimetres.">
+                    <button type="button" data-units="mm" class="active">mm</button>
+                    <button type="button" data-units="in">in</button>
+                </span>
                 <label id="bg-toggle" title="Toggle background">
                     <span>BG:</span>
                     <select id="bg-select">
@@ -56,6 +65,7 @@
                     </select>
                 </label>
             </div>
+            <a id="repo-link" href="https://github.com/Grooves-n-Grain/pieceout" target="_blank" rel="noopener" title="Source code and issues on GitHub">GitHub</a>
         </header>
 
         <div id="main">
@@ -80,22 +90,22 @@
             <aside id="layout-sidebar" class="layout-only">
                 <div id="layout-sidebar-header">
                     <h2>Layout</h2>
-                    <label id="template-picker">
+                    <label id="template-picker" title="Choose which project to generate. Changing it resets every parameter.">
                         <span>Template:</span>
                         <select id="template-select"></select>
                     </label>
                 </div>
                 <div id="layout-form">
                     <details id="group-lamp" open>
-                        <summary>Lamp</summary>
+                        <summary title="Dimensions of the finished lamp.">Lamp</summary>
                         <div class="param-list"></div>
                     </details>
                     <details id="group-derived" open>
-                        <summary>Derived</summary>
+                        <summary title="Sizes computed from the lamp inputs. Tick a box to override one by hand.">Derived</summary>
                         <div class="param-list"></div>
                     </details>
                     <details id="group-machine">
-                        <summary>Machine &amp; sheets</summary>
+                        <summary title="Bit, spacing and blank sizes used to nest parts onto sheets.">Machine &amp; sheets</summary>
                         <div class="param-list"></div>
                     </details>
                     <div id="layout-messages"></div>
@@ -113,18 +123,18 @@
                 </div>
                 <div id="trace-form">
                     <details id="group-trace-image" open>
-                        <summary>Image</summary>
+                        <summary title="How the picture is turned into black and white before tracing.">Image</summary>
                         <div class="param-list"></div>
                     </details>
                     <details id="group-trace-checks" open>
-                        <summary>Checks</summary>
+                        <summary title="Cutting sanity checks: thin features, bridge tabs and island cleanup.">Checks</summary>
                         <div class="param-list"></div>
                     </details>
                     <details id="group-trace-size" open>
-                        <summary>Size</summary>
+                        <summary title="Physical size of the exported panel.">Size</summary>
                         <div class="param-list"></div>
                         <div class="param-row">
-                            <label for="trace-panel-select">Fit to panel</label>
+                            <label for="trace-panel-select" class="has-help" title="Scale the trace to a panel from the Layout tab. Turns off the outline, since the panel already has one.">Fit to panel</label>
                             <select id="trace-panel-select"><option value="">None</option></select>
                             <span class="unit"></span>
                         </div>
@@ -134,6 +144,7 @@
                         <div>
                             <button id="btn-bridge-all" class="small-btn" title="Bridge every island">Bridge all</button>
                             <button id="btn-delete-all" class="small-btn" title="Delete every island">Delete all</button>
+                            <button id="btn-keep-all" class="small-btn" title="Mark every island as kept: left in place on purpose, so it is not counted as falling out. Reads Unkeep all once they all are.">Keep all</button>
                             <button id="btn-trace-undo" class="small-btn" title="Undo the last bridge or delete">Undo</button>
                         </div>
                     </div>
@@ -207,8 +218,8 @@
                         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
                         </svg>
-                        <p>Drop SVG file here</p>
-                        <p class="sub">or click to browse</p>
+                        <p id="drop-zone-title">Drop SVG file here</p>
+                        <p id="drop-zone-sub" class="sub">or click to browse</p>
                         <input type="file" id="file-input" accept=".svg" hidden>
                     </div>
                 </div>

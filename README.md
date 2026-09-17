@@ -1,6 +1,6 @@
 # PieceOut
 
-**Preview what your CNC will actually cut — before you cut it.**
+**Preview what your CNC will actually cut, before you cut it.**
 
 Drop in an SVG (e.g. exported from Vectric), tell PieceOut which layers are profile cuts, pockets, or decoration, and get an instant visual of the finished piece. No install, no build step, runs in your browser.
 
@@ -10,16 +10,22 @@ https://github.com/user-attachments/assets/58ff067c-7a4c-46cc-a53a-e39b67bd0832
 
 ## What it does
 
-1. **Drag in an SVG** — every `<g>` layer is parsed (Vectric, Inkscape, anything that uses grouped layers).
+1. **Drag in an SVG.** Every `<g>` layer is parsed (Vectric, Inkscape, anything that uses grouped layers).
 2. **Auto-classify** each layer as `CUT`, `POCKET`, or `IGNORE` based on layer-name keywords (`profile`, `pocket`, `engrave`, etc.). You can override any of them.
-3. **See the result** — Preview mode renders cut paths punched out of a wood-colored material, with pockets shaded as recessed regions. Wireframe mode shows the raw geometry.
+3. **See the result.** Preview mode renders cut paths punched out of a wood-colored material, with pockets shaded as recessed regions. Wireframe mode shows the raw geometry.
 4. **Export a PNG** of the preview for documentation, client approval, or just remembering what you were planning.
+
+![Preview tab: a layered SVG rendered as a cut piece of wood](assets/screenshots/preview.png)
+
+Every control in the sidebars has hover help, and the `mm` / `in` toggle in the header shows all sizes in millimetres or decimal inches. Exported SVG files are always in millimetres, which Aspire and every other CAM reads without setup.
 
 ## Layout tab: generate cut files from dimensions
 
 Switch to the **Layout** tab to go the other direction: type in the dimensions of a piece and get true-size, nested SVG cut files back, ready for Vectric Aspire (or any CAM that imports SVG by layer).
 
 The first template is a Japanese Andon-style lamp: half-lapped square frames pinned with dowels, four legs, and basswood panels held by split dowels.
+
+![Layout tab: lamp parameters on the left, nested rails and legs on a sheet](assets/screenshots/layout.png)
 
 1. Enter the lamp dimensions (outer width, height, stock thickness, rail width, and so on). Derived sizes such as leg length and panel size update live, and any of them can be overridden.
 2. Set your bit diameter, gutter, edge margin, and sheet sizes once. They are remembered.
@@ -35,7 +41,9 @@ All geometry is true part geometry. Tool offsets, tabs, and feeds stay in your C
 
 The **Trace** tab turns a black and white image into a smooth vector cut file without leaving the browser. Black is the material that stays, white is what the laser removes.
 
-1. Open or drop a PNG, JPG, or WebP. Adjust threshold, invert, smoothness (how far the curves may stray from the pixels), and the speck size to ignore. Threshold is a single brightness cutoff (0 to 255), so a logo with grey or coloured elements on a dark background needs it lowered (around 60) before everything brighter than the background counts as a cut. Clean line art traces best; JPEG compression noise shows up as ragged edges.
+![Trace tab: a traced portrait with islands numbered and listed](assets/screenshots/trace.png)
+
+1. Open or drop a PNG, JPG, or WebP. Adjust threshold, invert colours (for white-on-dark art, or to cut the negative of a design), smoothness (how far the curves may stray from the pixels), and the speck size to ignore. Threshold is a single brightness cutoff (0 to 255), so a logo with grey or coloured elements on a dark background needs it lowered (around 60) before everything brighter than the background counts as a cut. Clean line art traces best; JPEG compression noise shows up as ragged edges.
 2. Every **island** (a black piece not connected to the border) is boxed in red and numbered. Islands fall out after cutting. Click **Bridge** to connect one to the body across the shortest gap at the width you set, **Delete** to drop it, or **Bridge all**. Bridges survive threshold changes; **Undo** steps back.
 3. Anything narrower than your kerf is boxed in orange.
 4. Set the width in mm, or pick a panel from the Layout tab and the art is fitted to that panel's safe area.
@@ -72,7 +80,7 @@ node serve.js
 
 Drag-and-drop `test-sample.svg` (included) to see it work, or use any SVG with grouped layers.
 
-No package manager, no build step, zero dependencies — just plain ES6 modules served by a tiny built-in Node HTTP server.
+No package manager, no build step, zero dependencies: just plain ES6 modules served by a tiny built-in Node HTTP server.
 
 ## Keyboard shortcuts
 
@@ -90,11 +98,12 @@ Mouse wheel zooms; click-drag pans; pinch + one-finger pan work on touch devices
 
 Vanilla JS modules, loaded directly as ES6 modules from `index.html`:
 
-- **[`js/svgParser.js`](js/svgParser.js)** — DOMParser-based SVG parsing. Extracts layers from `<g>` elements via `inkscape:label` or `id`. Collects all shape primitives (path / polygon / rect / circle / ellipse / line) per layer.
-- **[`js/layerTagger.js`](js/layerTagger.js)** — keyword-based auto-classification with localStorage-persisted overrides.
-- **[`js/renderer.js`](js/renderer.js)** — the visualization engine. Preview mode uses an SVG `<mask>` with `fill-rule="evenodd"` to punch CUT paths out of a material rectangle (handles complex outer-with-inner-cutouts geometry correctly). Pocket layers render as a darkened overlay.
-- **[`js/viewport.js`](js/viewport.js)** — zoom/pan via viewBox manipulation. Mouse + touch.
-- **[`js/app.js`](js/app.js)** — orchestrator. State, file upload, view modes, PNG export.
+- **[`js/svgParser.js`](js/svgParser.js)**: DOMParser-based SVG parsing. Extracts layers from `<g>` elements via `inkscape:label` or `id`. Collects all shape primitives (path / polygon / rect / circle / ellipse / line) per layer.
+- **[`js/layerTagger.js`](js/layerTagger.js)**: keyword-based auto-classification with localStorage-persisted overrides.
+- **[`js/renderer.js`](js/renderer.js)**: the visualization engine. Preview mode uses an SVG `<mask>` with `fill-rule="evenodd"` to punch CUT paths out of a material rectangle (handles complex outer-with-inner-cutouts geometry correctly). Pocket layers render as a darkened overlay.
+- **[`js/viewport.js`](js/viewport.js)**: zoom/pan via viewBox manipulation. Mouse + touch.
+- **[`js/app.js`](js/app.js)**: orchestrator. State, file upload, view modes, PNG export.
+- **[`js/units.js`](js/units.js)**: the mm / inch display toggle. Pure conversion and formatting; every tab keeps its state in millimetres and converts only what is shown.
 - **[`js/layout/`](js/layout/)**: the Layout tab. `templates/andonLamp.js` derives parts and joinery from lamp dimensions, `joints/` holds the half-lap and dowel-hole generators, `nest.js` packs parts onto sheets, `svgWriter.js` serialises a sheet to a true-size layered SVG, and `layoutUI.js` / `layoutForm.js` drive the sidebar. Everything below the UI is pure and unit-tested.
 - **[`js/trace/`](js/trace/)**: the Trace tab. Pure raster pipeline (bitmap, components, contours, simplify, Bezier fit, thin features, bridging, SVG) plus the controller and overlay renderer.
 
@@ -110,7 +119,7 @@ Uses Node's built-in test runner. The golden SVGs in `tests/fixtures/` are the d
 
 ## Contributing
 
-Issues and PRs welcome. The codebase is intentionally small and dependency-free — please keep it that way unless there's a strong reason not to.
+Issues and PRs welcome. The codebase is intentionally small and dependency-free. Please keep it that way unless there's a strong reason not to.
 
 ## License
 

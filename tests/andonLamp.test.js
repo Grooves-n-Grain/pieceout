@@ -147,3 +147,13 @@ test('validate reports an error for an overridden lapLength too short for the do
     assert.doesNotThrow(() => { msgs = andonLamp.validate(params, d); });
     assert.ok(msgs.some(m => m.level === 'error' && m.field === 'railWidth' && /half-lap is too short/i.test(m.message)));
 });
+
+test('validate formats the panel dowel hole wall-clearance message in inches when asked', () => {
+    const tightRail = { ...params, panelInset: 2 };
+    const d = andonLamp.derive(tightRail);
+    const msgs = andonLamp.validate(tightRail, d, { units: 'in' });
+    const msg = msgs.find(m => m.level === 'error' && m.field === 'panelInset');
+    assert.ok(msg, 'expected a panelInset error');
+    assert.match(msg.message, /0\.039 in of wood/);
+    assert.doesNotMatch(msg.message, / mm /);
+});

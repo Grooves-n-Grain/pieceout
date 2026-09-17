@@ -17,32 +17,45 @@
 import { createPart, addRect, Material, Grain, Layer } from '../parts.js';
 import { halfLap } from '../joints/halfLap.js';
 import { dowelHole } from '../joints/dowelHole.js';
+import { formatLength } from '../../units.js';
 
 const MIN_WALL = 1; // mm of wood that must remain beside a hole
 
+// `help` is shown as hover text in the sidebar; keep each to one or two plain sentences.
 const params = [
-    { key: 'outerWidth',        label: 'Outer width',          group: 'lamp', default: 150,  min: 20,  step: 0.5, unit: 'mm' },
-    { key: 'overallHeight',     label: 'Overall height',       group: 'lamp', default: 200,  min: 20,  step: 0.5, unit: 'mm' },
-    { key: 'stockThickness',    label: 'Stock thickness',      group: 'lamp', default: 12.7, min: 3,   step: 0.1, unit: 'mm' },
-    { key: 'railWidth',         label: 'Rail width',           group: 'lamp', default: 25,   min: 5,   step: 0.5, unit: 'mm' },
-    { key: 'legSize',           label: 'Leg size (square)',    group: 'lamp', default: 12.7, min: 5,   step: 0.5, unit: 'mm' },
-    { key: 'panelInset',        label: 'Panel inset',          group: 'lamp', default: 13,   min: 1,   step: 0.5, unit: 'mm' },
+    { key: 'outerWidth',        label: 'Outer width',          group: 'lamp', default: 150,  min: 20,  step: 0.5, unit: 'mm',
+      help: 'Outside dimension of the square frame, corner to corner. Sets the rail length and, with rail width and panel inset, the panel and lid sizes.' },
+    { key: 'overallHeight',     label: 'Overall height',       group: 'lamp', default: 200,  min: 20,  step: 0.5, unit: 'mm',
+      help: 'Total height of the finished lamp, base to lid. Leg length is this minus two stock thicknesses (one frame at each end).' },
+    { key: 'stockThickness',    label: 'Stock thickness',      group: 'lamp', default: 12.7, min: 3,   step: 0.1, unit: 'mm',
+      help: 'Thickness of the hardwood slab the rails and legs come from. Half-laps are cut half this deep.' },
+    { key: 'railWidth',         label: 'Rail width',           group: 'lamp', default: 25,   min: 5,   step: 0.5, unit: 'mm',
+      help: 'Width of each frame rail seen from above. Also the length of the corner half-laps, and a wider rail shrinks the lid opening.' },
+    { key: 'legSize',           label: 'Leg size (square)',    group: 'lamp', default: 12.7, min: 5,   step: 0.5, unit: 'mm',
+      help: 'Cross-section of the four square legs. What is left of the rail between the legs is where the panel dowels go.' },
+    { key: 'panelInset',        label: 'Panel inset',          group: 'lamp', default: 13,   min: 1,   step: 0.5, unit: 'mm',
+      help: 'Distance from the rail\'s outer edge to the panel plane. Sets where the panel dowel holes sit across the rail; needs 1 mm of wood on each side of the hole.' },
     // Recorded for the cut list and future joint types; v1 geometry does not use it.
-    { key: 'panelThickness',    label: 'Panel thickness',      group: 'lamp', default: 3.2,  min: 0.5, step: 0.1, unit: 'mm' },
-    { key: 'panelClearance',    label: 'Panel clearance',      group: 'lamp', default: 0.5,  min: 0,   step: 0.1, unit: 'mm' },
-    { key: 'panelOverlap',      label: 'Panel overlap into frame', group: 'lamp', default: 6, min: 0, step: 0.5, unit: 'mm' },
-    { key: 'dowelHoleDia',      label: 'Dowel hole diameter',  group: 'lamp', default: 6.2,  min: 1,   step: 0.1, unit: 'mm' },
-    { key: 'panelDowelsPerRail', label: 'Panel dowels per rail', group: 'lamp', default: 2,  min: 1,   step: 1,   unit: '', integer: true },
+    { key: 'panelThickness',    label: 'Panel thickness',      group: 'lamp', default: 3.2,  min: 0.5, step: 0.1, unit: 'mm',
+      help: 'Thickness of the basswood panels. Recorded for the cut list only; the v1 geometry does not use it.' },
+    { key: 'panelClearance',    label: 'Panel clearance',      group: 'lamp', default: 0.5,  min: 0,   step: 0.1, unit: 'mm',
+      help: 'Fit allowance subtracted from every panel\'s width and height so it slides into place without forcing.' },
+    { key: 'panelOverlap',      label: 'Panel overlap into frame', group: 'lamp', default: 6, min: 0, step: 0.5, unit: 'mm',
+      help: 'How far each side panel tucks into the frame at top and bottom. Adds to panel height and draws the GUIDE rectangle on each panel. Cannot exceed stock thickness.' },
+    { key: 'dowelHoleDia',      label: 'Dowel hole diameter',  group: 'lamp', default: 6.2,  min: 1,   step: 0.1, unit: 'mm',
+      help: 'Finished diameter of every dowel hole, corner and panel. Match your dowel stock plus fit allowance.' },
+    { key: 'panelDowelsPerRail', label: 'Panel dowels per rail', group: 'lamp', default: 2,  min: 1,   step: 1,   unit: '', integer: true,
+      help: 'Number of holes per rail that pin the side panel, spread evenly between the legs. More holes need a longer rail.' },
 ];
 
 const derivedFields = [
-    { key: 'railLength',      label: 'Rail length' },
-    { key: 'lapLength',       label: 'Half-lap length' },
-    { key: 'lapDepth',        label: 'Half-lap depth' },
-    { key: 'legLength',       label: 'Leg length' },
-    { key: 'sidePanelWidth',  label: 'Side panel width' },
-    { key: 'sidePanelHeight', label: 'Side panel height' },
-    { key: 'lidSize',         label: 'Lid / base panel size' },
+    { key: 'railLength',      label: 'Rail length',           unit: 'mm', help: 'Length of each of the 8 rails. Computed as outer width.' },
+    { key: 'lapLength',       label: 'Half-lap length',       unit: 'mm', help: 'Length of the half-lap at each rail end. Computed as rail width.' },
+    { key: 'lapDepth',        label: 'Half-lap depth',        unit: 'mm', help: 'Depth of each half-lap. Computed as half the stock thickness.' },
+    { key: 'legLength',       label: 'Leg length',            unit: 'mm', help: 'Length of each of the 4 legs. Computed as overall height minus two stock thicknesses.' },
+    { key: 'sidePanelWidth',  label: 'Side panel width',      unit: 'mm', help: 'Width of each side panel. Computed as outer width minus two panel insets minus clearance.' },
+    { key: 'sidePanelHeight', label: 'Side panel height',     unit: 'mm', help: 'Height of each side panel. Computed as leg length plus two overlaps minus clearance.' },
+    { key: 'lidSize',         label: 'Lid / base panel size', unit: 'mm', help: 'Side of the square lid and base panels. Computed as outer width minus two rail widths minus clearance.' },
 ];
 
 function defaults() {
@@ -66,7 +79,7 @@ function derive(p, overrides = {}) {
     return { railLength, lapLength, lapDepth, legLength, sidePanelWidth, sidePanelHeight, lidSize, panelHoleXs };
 }
 
-function validate(p, d) {
+function validate(p, d, { units = 'mm' } = {}) {
     const msgs = [];
     const error = (field, message) => msgs.push({ level: 'error', field, message });
     const warn = (field, message) => msgs.push({ level: 'warn', field, message });
@@ -87,7 +100,7 @@ function validate(p, d) {
     if (d.lapDepth <= 0) error('stockThickness', 'Half-lap depth must be positive; check stock thickness.');
     if (p.panelOverlap > p.stockThickness) error('panelOverlap', 'Panel overlap cannot exceed the stock thickness (the panel would poke out of the frame).');
     if (p.panelInset - r < MIN_WALL || p.panelInset + r > p.railWidth - MIN_WALL) {
-        error('panelInset', `Panel dowel hole needs ${MIN_WALL} mm of wood on each side; move the inset or widen the rail.`);
+        error('panelInset', `Panel dowel hole needs ${formatLength(MIN_WALL, units)} of wood on each side; move the inset or widen the rail.`);
     }
     if (d.railLength - 2 * p.legSize <= 0) error('legSize', 'Legs are wider than the rail leaves room for.');
     const lo = d.lapLength + r + MIN_WALL;

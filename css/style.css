@@ -5,21 +5,28 @@
 }
 
 :root {
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --bg-surface: #0f3460;
-    --text-primary: #e0e0e0;
-    --text-secondary: #a0a0a0;
-    --accent: #e94560;
-    --accent-hover: #ff6b81;
+    /* Charcoal surfaces, burnt orange accent. Errors and warnings keep their own hues so
+       they never read as the brand colour. */
+    --bg-primary: #1c1c1e;
+    --bg-secondary: #232326;
+    --bg-surface: #2c2c30;
+    --text-primary: #ece7e1;
+    --text-secondary: #a39e97;
+    --accent: #d9622b;
+    --accent-hover: #ee7a42;
+    --accent-soft: rgba(217, 98, 43, 0.14);
+    --danger: #ff5f5f;
+    --danger-soft: rgba(255, 95, 95, 0.12);
+    --warn: #f2c94c;
+    --warn-soft: rgba(242, 201, 76, 0.14);
     --wood-color: #C4A265;
     --cut-color: var(--bg-primary);
-    --border: #2a2a4a;
+    --border: #38383d;
     --sidebar-width: 280px;
     --header-height: 48px;
 
     /* Layer tag colors */
-    --tag-cut: #e94560;
+    --tag-cut: var(--accent);
     --tag-pocket: #4a9eff;
     --tag-ignore: #666;
 }
@@ -55,6 +62,30 @@ header h1 {
     font-weight: 600;
     color: var(--accent);
     letter-spacing: 1px;
+}
+
+#app-version {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0;
+    vertical-align: middle;
+}
+
+#repo-link {
+    margin-left: auto;
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    transition: all 0.15s;
+}
+
+#repo-link:hover {
+    color: var(--text-primary);
+    border-color: var(--accent);
 }
 
 #toolbar {
@@ -222,7 +253,7 @@ header h1 {
 
 .layer-type.cut {
     color: var(--tag-cut);
-    background: rgba(233, 69, 96, 0.15);
+    background: var(--accent-soft);
 }
 
 .layer-type.pocket {
@@ -288,7 +319,7 @@ header h1 {
 }
 
 #drop-zone.drag-over {
-    background: rgba(233, 69, 96, 0.1);
+    background: var(--accent-soft);
     border: 2px dashed var(--accent);
 }
 
@@ -401,8 +432,8 @@ body.mode-trace .layout-only {
     display: none !important;
 }
 
-body.mode-layout #drop-zone,
-body.mode-trace #drop-zone {
+/* Trace shares the drop zone with Preview; app.js decides when it shows there. */
+body.mode-layout #drop-zone {
     display: none;
 }
 
@@ -483,6 +514,13 @@ body.mode-trace #drop-zone {
     white-space: nowrap;
 }
 
+/* Labels with hover help (native title tooltip) get a dotted underline as the cue. */
+.param-row label.has-help {
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+    cursor: help;
+}
+
 .param-row input[type="number"] {
     width: 100%;
     background: var(--bg-primary);
@@ -500,7 +538,7 @@ body.mode-trace #drop-zone {
 }
 
 .param-row input.invalid {
-    border-color: var(--accent);
+    border-color: var(--danger);
 }
 
 .param-row .unit {
@@ -524,13 +562,13 @@ body.mode-trace #drop-zone {
 }
 
 .msg-error {
-    color: var(--accent);
-    background: rgba(233, 69, 96, 0.12);
+    color: var(--danger);
+    background: var(--danger-soft);
 }
 
 .msg-warn {
-    color: #f5a623;
-    background: rgba(245, 166, 35, 0.12);
+    color: var(--warn);
+    background: var(--warn-soft);
 }
 
 .msg-info {
@@ -608,8 +646,9 @@ body.mode-trace #drop-zone {
 
 #trace-islands-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
+    gap: 4px 8px;
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--border);
@@ -619,6 +658,16 @@ body.mode-trace #drop-zone {
     font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* Four bulk buttons no longer fit beside the count at sidebar width, so they take their
+   own row and stay together instead of orphaning the last one. */
+#trace-islands-header > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex-basis: 100%;
 }
 
 #trace-bridge-hint {
@@ -637,17 +686,17 @@ body.mode-trace #drop-zone {
 }
 
 .island-row .island-index {
-    color: #e94560;
+    color: var(--accent);
     font-weight: 600;
 }
 
 .island-row.selected {
-    background: rgba(233, 69, 96, 0.12);
+    background: var(--accent-soft);
     border-radius: 3px;
 }
 
 /* A kept island is left as a separate piece on purpose, not a bridging failure - muted grey
-   instead of the alarm red used for a plain island. */
+   instead of the accent orange used for a plain island. */
 .island-row.kept .island-index {
     color: #94a3b8;
 }
@@ -665,12 +714,12 @@ body.mode-trace #drop-zone {
 }
 
 /* Overlay colours on the shared canvas */
-.trace-island-mark { fill: rgba(233, 69, 96, 0.35); stroke: #e94560; stroke-width: 1; cursor: pointer; }
-.trace-island-label { fill: #e94560; font-family: sans-serif; cursor: pointer; }
+.trace-island-mark { fill: rgba(217, 98, 43, 0.35); stroke: var(--accent); stroke-width: 1; cursor: pointer; }
+.trace-island-label { fill: var(--accent); font-family: sans-serif; cursor: pointer; }
 .trace-island-mark.kept { fill: rgba(148, 163, 184, 0.25); stroke: #94a3b8; }
 .trace-island-label.kept { fill: #94a3b8; }
 .trace-island-pin { fill: #94a3b8; }
-.trace-thin-mark { fill: rgba(245, 166, 35, 0.35); stroke: #f5a623; stroke-width: 1; }
+.trace-thin-mark { fill: rgba(242, 201, 76, 0.35); stroke: var(--warn); stroke-width: 1; }
 .trace-bridge { fill: none; stroke: #4ade80; stroke-width: 2; stroke-linecap: round; }
 .trace-contour { fill: none; stroke: #22d3ee; stroke-width: 0.8; }
 .trace-marquee { fill: rgba(34, 211, 238, 0.12); stroke: #22d3ee; stroke-width: 1; stroke-dasharray: 4 2; vector-effect: non-scaling-stroke; pointer-events: none; }
@@ -816,16 +865,16 @@ body.mode-trace #drop-zone {
     margin-top: 6px;
 }
 
-.legend-swatch.island { background: rgba(233, 69, 96, 0.35); border: 1px solid #e94560; }
+.legend-swatch.island { background: rgba(217, 98, 43, 0.35); border: 1px solid var(--accent); }
 .legend-swatch.island.kept { background: rgba(148, 163, 184, 0.25); border: 1px solid #94a3b8; }
-.legend-swatch.thin { background: rgba(245, 166, 35, 0.35); border: 1px solid #f5a623; }
+.legend-swatch.thin { background: rgba(242, 201, 76, 0.35); border: 1px solid var(--warn); }
 .legend-swatch.bridge { background: #4ade80; }
 .legend-swatch.contour { background: #22d3ee; }
 
 .legend-number {
     flex-shrink: 0;
     font-weight: 600;
-    color: #e94560;
+    color: var(--accent);
 }
 
 /* Relief follows the existing workspace; its imagery owns the shared canvas only on this tab. */
@@ -858,7 +907,7 @@ body.mode-relief #drop-zone { display: none !important; }
 #relief-generate { width: 100%; margin-top: 8px; background: var(--accent); color: white; }
 #relief-progress { width: 100%; margin-top: 12px; accent-color: var(--wood-color); }
 #relief-status { font-size: 12px; line-height: 1.5; margin: 12px 0; }
-#relief-status.error { color: #ff9eaa; }
+#relief-status.error { color: var(--danger); }
 .relief-exports { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px; }
 .relief-exports a { color: var(--text-primary); font-size: 12px; cursor: pointer; }
 .relief-exports .toolbar-btn { text-decoration: none; text-align: center; padding: 10px; }
@@ -894,3 +943,31 @@ body.mode-relief #drop-zone { display: none !important; }
 .relief-3d-status { position: absolute; top: 70px; left: 20px; right: 20px; text-align: center; font-size: 13px; pointer-events: none; }
 .relief-3d-tools { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .relief-3d-tools span { font-size: 11px; color: var(--text-secondary); }
+
+/* Units toggle (mm / in) - header, next to the background toggle */
+.units-toggle {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.units-toggle button {
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border: none;
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.units-toggle button + button {
+    border-left: 1px solid var(--border);
+}
+
+.units-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+}

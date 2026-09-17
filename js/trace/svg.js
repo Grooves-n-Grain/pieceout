@@ -11,7 +11,7 @@ import { simplifyPolygon } from './simplify.js';
 import { fitBeziers } from './fitCurves.js';
 import { findThinFeatures } from './thin.js';
 
-const COLORS = { CUT: '#e94560', GUIDE: '#888888', THIN: '#f5a623' };
+const COLORS = { CUT: '#d9622b', GUIDE: '#888888', THIN: '#f2c94c' };
 
 function fitLoop(points, tolerancePx) {
     return fitBeziers(simplifyPolygon(points, tolerancePx), tolerancePx);

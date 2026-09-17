@@ -4,14 +4,22 @@
  */
 import { Material } from './parts.js';
 
+// `help` is shown as hover text in the sidebar; keep each to one or two plain sentences.
 export const MACHINE_PARAMS = [
-    { key: 'bitDiameter',         label: 'Bit diameter',          group: 'machine', default: 6,   min: 0.5, step: 0.1, unit: 'mm' },
-    { key: 'gutter',              label: 'Gutter between parts',  group: 'machine', default: 9,   min: 0.5, step: 0.5, unit: 'mm' },
-    { key: 'edgeMargin',          label: 'Sheet edge margin',     group: 'machine', default: 15,  min: 0,   step: 0.5, unit: 'mm' },
-    { key: 'hardwoodSheetWidth',  label: 'Hardwood sheet width',  group: 'machine', default: 300, min: 10,  step: 1,   unit: 'mm' },
-    { key: 'hardwoodSheetHeight', label: 'Hardwood sheet height', group: 'machine', default: 600, min: 10,  step: 1,   unit: 'mm' },
-    { key: 'basswoodSheetWidth',  label: 'Basswood sheet width',  group: 'machine', default: 300, min: 10,  step: 1,   unit: 'mm' },
-    { key: 'basswoodSheetHeight', label: 'Basswood sheet height', group: 'machine', default: 300, min: 10,  step: 1,   unit: 'mm' },
+    { key: 'bitDiameter',         label: 'Bit diameter',          group: 'machine', default: 6,   min: 0.5, step: 0.1, unit: 'mm',
+      help: 'Diameter of the cutting bit. Only used to check the gutter is wide enough; no tool offset is applied to the geometry, Aspire does that.' },
+    { key: 'gutter',              label: 'Gutter between parts',  group: 'machine', default: 9,   min: 0.5, step: 0.5, unit: 'mm',
+      help: 'Empty space left between neighbouring parts on a sheet. Must be at least the bit diameter.' },
+    { key: 'edgeMargin',          label: 'Sheet edge margin',     group: 'machine', default: 15,  min: 0,   step: 0.5, unit: 'mm',
+      help: 'Unusable border on all four sheet edges, for clamps and tabs. Parts are nested inside it.' },
+    { key: 'hardwoodSheetWidth',  label: 'Hardwood sheet width',  group: 'machine', default: 300, min: 10,  step: 1,   unit: 'mm',
+      help: 'Width of the hardwood blank the rails and legs are nested onto. Parts that do not fit spill onto another sheet.' },
+    { key: 'hardwoodSheetHeight', label: 'Hardwood sheet height', group: 'machine', default: 600, min: 10,  step: 1,   unit: 'mm',
+      help: 'Height of the hardwood blank. Rails and legs keep their grain along their length and are never rotated.' },
+    { key: 'basswoodSheetWidth',  label: 'Basswood sheet width',  group: 'machine', default: 300, min: 10,  step: 1,   unit: 'mm',
+      help: 'Width of the basswood blank the panels are nested onto. Panels may be rotated 90 degrees to fit.' },
+    { key: 'basswoodSheetHeight', label: 'Basswood sheet height', group: 'machine', default: 300, min: 10,  step: 1,   unit: 'mm',
+      help: 'Height of the basswood blank the panels are nested onto.' },
 ];
 
 export function defaultMachine() {

@@ -7,7 +7,13 @@
  * only makes sense for one island) whenever `data.islands` is an array instead of a single
  * island's own fields.
  */
-import { formatMm2 } from './traceSidebar.js';
+import { formatArea, formatDisplay, fromDisplay, displayUnit, displayStep, toDisplay } from '../units.js';
+
+/** Rounds an mm floor/min value into the active display units, like layoutForm.js's helper. */
+function roundedDisplay(mm, units) {
+    const v = toDisplay(mm, 'mm', units);
+    return units === 'in' ? Math.round(v * 1000) / 1000 : v;
+}
 
 function button(doc, text, title, onClick) {
     const btn = doc.createElement('button');
@@ -19,7 +25,7 @@ function button(doc, text, title, onClick) {
     return btn;
 }
 
-export function renderIslandPopover(el, data, { bridgeMm, kept, onBridge, onPlace, onDelete, onKeep, onClose }) {
+export function renderIslandPopover(el, data, { bridgeMm, kept, units = 'mm', onBridge, onPlace, onDelete, onKeep, onClose }) {
     const doc = el.ownerDocument;
     el.innerHTML = '';
     const group = Array.isArray(data.islands);
@@ -27,8 +33,8 @@ export function renderIslandPopover(el, data, { bridgeMm, kept, onBridge, onPlac
     const header = doc.createElement('div');
     header.className = 'popover-header';
     header.textContent = group
-        ? `${data.islands.length} islands selected (${formatMm2(data.mm2)} mm2 total)`
-        : `Island ${data.number} (${formatMm2(data.mm2)} mm2)`;
+        ? `${data.islands.length} islands selected (${formatArea(data.mm2, units)} total)`
+        : `Island ${data.number} (${formatArea(data.mm2, units)})`;
     el.appendChild(header);
 
     const row = doc.createElement('div');
@@ -39,12 +45,12 @@ export function renderIslandPopover(el, data, { bridgeMm, kept, onBridge, onPlac
     const input = doc.createElement('input');
     input.type = 'number';
     input.id = 'trace-popover-width';
-    input.step = '0.1';
-    input.min = '0.2';
-    input.value = String(bridgeMm);
+    input.step = String(displayStep(0.1, 'mm', units));
+    input.min = String(roundedDisplay(0.2, units));
+    input.value = formatDisplay(bridgeMm, 'mm', units);
     const unit = doc.createElement('span');
     unit.className = 'unit';
-    unit.textContent = 'mm';
+    unit.textContent = displayUnit('mm', units);
     row.append(label, input, unit);
     el.appendChild(row);
 
@@ -56,7 +62,8 @@ export function renderIslandPopover(el, data, { bridgeMm, kept, onBridge, onPlac
     });
 
     function currentWidthMm() {
-        const n = parseFloat(input.value);
+        const raw = parseFloat(input.value);
+        const n = Number.isFinite(raw) ? fromDisplay(raw, 'mm', units) : NaN;
         return Number.isFinite(n) && n > 0 ? n : bridgeMm;
     }
 

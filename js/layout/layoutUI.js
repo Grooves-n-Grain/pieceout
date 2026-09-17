@@ -16,6 +16,7 @@ import { parseSVG } from '../svgParser.js';
 import { injectSVG, showWireframe } from '../renderer.js';
 import { createLayerState } from '../layerTagger.js';
 import { setInitialView, refreshViewBox } from '../viewport.js';
+import { getUnits, onUnitsChange, formatDisplay } from '../units.js';
 
 const TEMPLATES = [andonLamp];
 
@@ -88,25 +89,27 @@ export function initLayout({ canvas, onSendToPreview }) {
     }
 
     function renderForm(derived) {
+        const units = getUnits();
         renderParamInputs(lampList, state.template.params, state.params, (key, value) => {
             state.params[key] = value;
             regenerate({ rebuildForm: false });
-        });
+        }, { units });
         renderDerived(derivedList, state.template.derivedFields, derived, state.overrides, (key, value) => {
             if (value === undefined) delete state.overrides[key];
             else state.overrides[key] = value;
             regenerate({ rebuildForm: false });
-        });
+        }, { units });
         renderParamInputs(machineList, MACHINE_PARAMS, state.machine, (key, value) => {
             state.machine[key] = value;
             regenerate({ rebuildForm: false });
-        });
+        }, { units });
     }
 
     function refreshDerivedValues(derived) {
+        const units = getUnits();
         for (const def of state.template.derivedFields) {
             const input = document.getElementById(`derived-${def.key}`);
-            if (input && input.disabled) input.value = String(Math.round(derived[def.key] * 1000) / 1000);
+            if (input && input.disabled) input.value = formatDisplay(derived[def.key], def.unit || 'mm', units);
         }
     }
 
@@ -116,7 +119,8 @@ export function initLayout({ canvas, onSendToPreview }) {
             const opt = document.createElement('option');
             opt.value = String(i);
             const total = state.sheets.filter(s => s.material === sheet.material).length;
-            opt.textContent = `${sheet.material} ${sheet.index} of ${total}`;
+            const material = sheet.material.charAt(0).toUpperCase() + sheet.material.slice(1);
+            opt.textContent = `${material}, sheet ${sheet.index} of ${total}`;
             sheetSelect.appendChild(opt);
         });
         if (state.sheetIndex >= state.sheets.length) state.sheetIndex = 0;
@@ -148,9 +152,10 @@ export function initLayout({ canvas, onSendToPreview }) {
     }
 
     function regenerate({ rebuildForm }) {
+        const units = getUnits();
         const derived = state.template.derive(state.params, state.overrides);
         const messages = [
-            ...state.template.validate(state.params, derived),
+            ...state.template.validate(state.params, derived, { units }),
             ...validateMachine(state.machine),
         ];
         let hasErrors = messages.some(m => m.level === 'error');
@@ -160,7 +165,7 @@ export function initLayout({ canvas, onSendToPreview }) {
             try {
                 const parts = state.template.build(state.params, derived);
                 state.parts = parts;
-                state.sheets = nest(parts, state.machine);
+                state.sheets = nest(parts, state.machine, { units });
                 state.svgs = state.sheets.map(sheetToSVG);
             } catch (err) {
                 messages.push({
@@ -224,6 +229,8 @@ export function initLayout({ canvas, onSendToPreview }) {
     });
 
     regenerate({ rebuildForm: true });
+
+    onUnitsChange(() => regenerate({ rebuildForm: true }));
 
     return {
         show() {

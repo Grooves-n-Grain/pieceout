@@ -524,7 +524,7 @@ export function exportPNG(canvasEl) {
         // Draw background
         const viewport = document.getElementById('viewport');
         const bgStyle = getComputedStyle(viewport);
-        ctx.fillStyle = bgStyle.backgroundColor || '#1a1a2e';
+        ctx.fillStyle = bgStyle.backgroundColor || '#1c1c1e';
         ctx.fillRect(0, 0, w, h);
 
         ctx.drawImage(img, 0, 0, w, h);

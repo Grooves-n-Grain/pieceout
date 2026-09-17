@@ -92,3 +92,15 @@ test('nest throws NestError for a part that cannot fit', () => {
     const huge = createPart({ name: 'Huge', material: Material.HARDWOOD, width: 700, height: 20 });
     assert.throws(() => nest([huge], m), (err) => err instanceof NestError && err.part === 'Huge');
 });
+
+test('nest throws a NestError formatted in inches when asked', () => {
+    const m = defaultMachine();
+    const huge = createPart({ name: 'Huge', material: Material.HARDWOOD, width: 700, height: 20 });
+    assert.throws(() => nest([huge], m, { units: 'in' }), (err) => {
+        assert.ok(err instanceof NestError);
+        assert.equal(err.part, 'Huge');
+        assert.match(err.message, /27\.559 x 0\.787 in/);
+        assert.doesNotMatch(err.message, / mm/);
+        return true;
+    });
+});

@@ -6,7 +6,7 @@
     <rect x="153.5" y="21" width="111.5" height="174.1"/>
     <text x="150.5" y="21" font-size="4" font-family="sans-serif" fill="#888888" stroke="none">Side panel 2</text>
   </g>
-  <g id="CUT" inkscape:label="CUT" inkscape:groupmode="layer" fill="none" stroke="#e94560" stroke-width="0.3">
+  <g id="CUT" inkscape:label="CUT" inkscape:groupmode="layer" fill="none" stroke="#d9622b" stroke-width="0.3">
     <rect x="15" y="15" width="123.5" height="186.1"/>
     <rect x="147.5" y="15" width="123.5" height="186.1"/>
   </g>
