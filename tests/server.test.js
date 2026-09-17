@@ -17,6 +17,11 @@ test('static frontend works while backend and internal files are inaccessible', 
     try {
         assert.equal((await fetch(base + '/')).status, 200);
         assert.equal((await fetch(base + '/js/app.js?v=1')).status, 200);
+        const manifest = await fetch(base + '/assets/icons/manifest.webmanifest');
+        assert.equal(manifest.status, 200);
+        assert.equal(manifest.headers.get('content-type'), 'application/manifest+json');
+        assert.equal((await fetch(base + '/assets/icons/icon-192.png')).status, 200);
+        assert.equal((await fetch(base + '/assets/icons/icon.svg')).status, 200);
         for (const path of ['/services/relief/relief/api.py', '/.git/config', '/serve.js', '/docs/design/cnc-relief-ai-codex-brief.md', '/js/%2e%2e/serve.js']) {
             assert.equal((await fetch(base + path)).status, 404, path);
         }
