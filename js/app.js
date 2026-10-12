@@ -18,6 +18,7 @@ import {
 import { initLayout } from './layout/layoutUI.js';
 import { initTrace } from './trace/traceUI.js';
 import { initRelief } from './relief/reliefUI.js';
+import { initGenerate } from './generate/generateUI.js';
 import { loadUnits, saveUnits, getUnits, setUnits, onUnitsChange } from './units.js';
 
 // --- State ---
@@ -35,7 +36,7 @@ const canvas = document.getElementById('svg-canvas');
 const viewport = document.getElementById('viewport');
 const layerListEl = document.getElementById('layer-list');
 
-let activeTab = 'preview'; // 'preview' | 'layout' | 'trace' | 'relief'
+let activeTab = 'preview'; // 'preview' | 'layout' | 'trace' | 'relief' | 'generate'
 const tabViews = {}; // per-tab saved pan/zoom, keyed by tab name
 const tabButtons = document.querySelectorAll('.tab-btn');
 
@@ -105,6 +106,10 @@ container.addEventListener('drop', (e) => {
     dropZone.classList.remove('drag-over');
 
     const file = e.dataTransfer?.files[0];
+    if (activeTab === 'generate') {
+        if (file) generate.loadSubjectFile(file);
+        return;
+    }
     if (activeTab === 'relief') {
         if (file) relief.loadFile(file);
         return;
@@ -197,6 +202,7 @@ function getBackgroundColor() {
 
 function setTab(tab) {
     if (activeTab === 'relief' && tab !== 'relief') relief.hide();
+    if (activeTab === 'generate' && tab !== 'generate') generate.hide();
     // Remember the tab we're leaving's own pan/zoom before switching away from it - the
     // canvas and its viewBox are shared by all three tabs, so without this every switch would
     // silently lose whatever view the previous tab had.
@@ -206,6 +212,7 @@ function setTab(tab) {
     document.body.classList.toggle('mode-layout', tab === 'layout');
     document.body.classList.toggle('mode-trace', tab === 'trace');
     document.body.classList.toggle('mode-relief', tab === 'relief');
+    document.body.classList.toggle('mode-generate', tab === 'generate');
     tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
 
     if (tab === 'preview') {
@@ -221,6 +228,8 @@ function setTab(tab) {
         layout.show();
     } else if (tab === 'relief') {
         relief.show();
+    } else if (tab === 'generate') {
+        generate.show();
     } else {
         trace.show();
     }
@@ -330,8 +339,9 @@ btnExportPNG.addEventListener('click', () => {
 // --- Keyboard shortcuts ---
 
 document.addEventListener('keydown', (e) => {
-    // Don't capture if typing in an input
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    // Don't capture if typing in an input, select, or textarea (the Generate tab's prompt and
+    // style preamble textareas need this too, or "f" while typing "roof" would flip the view).
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
     switch (e.key.toLowerCase()) {
         case 'escape':
@@ -409,6 +419,23 @@ const trace = initTrace({
 });
 
 const relief = initRelief({ canvas, isActive: () => activeTab === 'relief' });
+
+// Switch to Trace first, same reasoning as sendToPreview above: loadFile() mutates the shared
+// viewport, and it must do so while Trace is already the active tab.
+const generate = initGenerate({
+    canvas,
+    isActive: () => activeTab === 'generate',
+    onSendToTrace: (file) => {
+        setTab('trace');
+        trace.loadFile(file);
+    },
+    // Same reasoning as loadSVGContent's delete tabViews.preview: a brand new result always
+    // gets a fresh fit-to-view. Without discarding the stale saved Generate view here, the
+    // generic tab-view restore below would silently reapply it over that fresh fit the next
+    // time this tab becomes active (this matters especially when the result lands while
+    // another tab was showing, since the fit only happens on that later show()).
+    onNewResult: () => { delete tabViews.generate; },
+});
 
 // The browser restores #bg-select's value on reload but never fires its change event, so
 // apply it explicitly before the first tab render.

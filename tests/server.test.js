@@ -22,12 +22,24 @@ test('static frontend works while backend and internal files are inaccessible', 
         assert.equal(manifest.headers.get('content-type'), 'application/manifest+json');
         assert.equal((await fetch(base + '/assets/icons/icon-192.png')).status, 200);
         assert.equal((await fetch(base + '/assets/icons/icon.svg')).status, 200);
-        for (const path of ['/services/relief/relief/api.py', '/.git/config', '/serve.js', '/docs/design/cnc-relief-ai-codex-brief.md', '/js/%2e%2e/serve.js']) {
+        for (const path of ['/services/relief/relief/api.py', '/.git/config', '/serve.js', '/docs/design/cnc-relief-ai-codex-brief.md', '/js/%2e%2e/serve.js',
+            '/data/generate/profile.json', '/server/generate/.env', '/server/generate/index.js']) {
             assert.equal((await fetch(base + path)).status, 404, path);
         }
         const offline = await fetch(base + '/api/relief/health');
         assert.equal(offline.status, 503);
         assert.match((await offline.json()).detail, /relief service/i);
+    } finally { await close(server); }
+});
+
+test('createServer routes /api/generate/ to the generate handler with the real (uninjected) providers', async () => {
+    const server = createServer({ reliefUrl: 'http://127.0.0.1:1' });
+    const base = await listen(server);
+    try {
+        const response = await fetch(base + '/api/generate/providers');
+        assert.equal(response.status, 200);
+        const payload = await response.json();
+        assert.deepEqual(payload.providers.map(p => p.id), ['codex', 'gemini', 'local']);
     } finally { await close(server); }
 });
 

@@ -5,12 +5,14 @@ import assert from 'node:assert/strict';
 import { andonLamp } from '../js/layout/templates/andonLamp.js';
 import { MACHINE_PARAMS } from '../js/layout/machine.js';
 import { ALL_PARAMS as TRACE_PARAMS } from '../js/trace/params.js';
+import { GENERATE_FIELDS } from '../js/generate/params.js';
 
 const schemas = {
     'andonLamp.params': andonLamp.params,
     'andonLamp.derivedFields': andonLamp.derivedFields,
     'MACHINE_PARAMS': MACHINE_PARAMS,
     'trace ALL_PARAMS': TRACE_PARAMS,
+    'generate GENERATE_FIELDS': GENERATE_FIELDS,
 };
 
 for (const [name, schema] of Object.entries(schemas)) {

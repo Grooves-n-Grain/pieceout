@@ -51,6 +51,16 @@ The **Trace** tab turns a black and white image into a smooth vector cut file wi
 
 The tracer is written from scratch (contour following plus cubic Bezier fitting) so the repo stays MIT and dependency free.
 
+## Generate tab: prompt or sketch to panel artwork
+
+The optional **Generate** tab asks an image model for black and white panel artwork, then hands the result straight to Trace. Type what you want, optionally add a rough sketch or photo for the design to follow, pick a provider and press Generate.
+
+- **Style profile.** A saved preamble plus up to four pinned style reference images are sent with every request, whichever provider you pick. That is what keeps a set of panels looking like a set. Edit it under **Style profile** in the sidebar; it is stored on the server, not in the browser.
+- **Providers.** `ChatGPT (Codex login)` uses the official Codex CLI signed in with your own ChatGPT subscription; PieceOut never reads or stores a token. `Gemini` uses a Google AI Studio API key. `Local model` talks to any OpenAI compatible image server (for example stable-diffusion.cpp), which is free but can take many minutes per image on modest hardware.
+- **Send to Trace** opens the result in the Trace tab for island checks, bridging and SVG export. **Download PNG** saves it.
+
+Setup: copy `server/generate/.env.example` to `server/generate/.env`, fill in what you use, and restart the server. Providers that are not configured show as disabled with the reason. Keys stay on the server; the browser only ever talks to PieceOut. One generation runs at a time.
+
 ## Relief tab: image to recessed carving
 
 The optional **Relief** tab creates a heightmap for carving artwork into the front face of material. Upload a PNG, JPEG, WebP or HEIC/HEIF photo, set width and maximum depth, generate AI depth, then adjust the carving area, shape and smoothing. HEIC photos from an iPad are converted automatically for preview. Preview the mask, shaded surface or grayscale heightmap and download a genuine 16-bit PNG plus physical size/settings for Aspire.

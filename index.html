@@ -20,6 +20,7 @@
                 <button id="tab-layout" class="tab-btn" data-tab="layout">Layout</button>
                 <button id="tab-trace" class="tab-btn" data-tab="trace">Trace</button>
                 <button id="tab-relief" class="tab-btn" data-tab="relief">Relief</button>
+                <button id="tab-generate" class="tab-btn" data-tab="generate">Generate</button>
             </nav>
             <div id="toolbar">
                 <span class="preview-only toolbar-group">
@@ -49,6 +50,11 @@
                     <button id="btn-trace-vector" class="toolbar-btn" title="Toggle raster / vector view (V)">Vector</button>
                     <button id="btn-trace-export" class="toolbar-btn" title="Download the traced SVG">Export SVG</button>
                     <button id="btn-trace-send" class="toolbar-btn" title="Open the trace in the Preview tab">Send to Preview</button>
+                    <span class="separator"></span>
+                </span>
+                <span class="generate-only toolbar-group">
+                    <button id="btn-generate-send-trace" class="toolbar-btn" title="Convert the result to a file and open it in the Trace tab" disabled>Send to Trace</button>
+                    <button id="btn-generate-download" class="toolbar-btn" title="Download the generated image as a PNG file" disabled>Download PNG</button>
                     <span class="separator"></span>
                 </span>
                 <button id="btn-legend" class="toolbar-btn" title="Legend">?</button>
@@ -209,6 +215,72 @@
                         <a id="relief-metadata" data-file="metadata.json" download="pieceout-relief-settings.json" aria-disabled="true">Download size &amp; settings</a>
                         <p class="relief-help">White is the untouched face; darker values carve deeper. Set the component size and depth in Aspire and check its placement against the stock face.</p>
                     </div>
+                </div>
+            </aside>
+
+            <aside id="generate-sidebar" class="generate-only">
+                <div class="generate-heading">
+                    <h2>Generate artwork</h2>
+                    <p>Turn a prompt and an optional reference image into black and white panel artwork.</p>
+                </div>
+                <div id="generate-form">
+                    <div class="generate-field">
+                        <label for="generate-provider" class="has-help" data-help-key="provider">Provider</label>
+                        <select id="generate-provider" data-help-key="provider"></select>
+                    </div>
+                    <div class="generate-field">
+                        <label for="generate-prompt" class="has-help" data-help-key="prompt">Prompt</label>
+                        <textarea id="generate-prompt" maxlength="2000" rows="4" data-help-key="prompt" placeholder="A moose standing in a lake at night"></textarea>
+                        <span class="generate-counter" id="generate-prompt-counter">0 / 2000</span>
+                    </div>
+                    <div class="generate-field">
+                        <span class="has-help" data-help-key="subject">Subject image</span>
+                        <div class="generate-file-row">
+                            <button type="button" id="btn-generate-subject-open" class="small-btn">Open image</button>
+                            <input type="file" id="generate-subject-input" accept="image/png,image/jpeg,image/webp" hidden>
+                            <button type="button" id="btn-generate-subject-clear" class="small-btn" disabled>Clear</button>
+                        </div>
+                        <div class="generate-subject-preview" id="generate-subject-preview" hidden>
+                            <img id="generate-subject-thumb" alt="Subject reference thumbnail">
+                            <span id="generate-subject-name"></span>
+                        </div>
+                    </div>
+                    <div class="generate-field">
+                        <label for="generate-aspect" class="has-help" data-help-key="aspect">Aspect</label>
+                        <select id="generate-aspect" data-help-key="aspect"></select>
+                    </div>
+                    <div class="generate-field generate-checkbox">
+                        <input type="checkbox" id="generate-use-style" checked>
+                        <label for="generate-use-style" class="has-help" data-help-key="useStyle">Apply style profile</label>
+                    </div>
+                    <div class="generate-actions">
+                        <button type="button" id="btn-generate-run" class="toolbar-btn">Generate</button>
+                        <button type="button" id="btn-generate-cancel" class="small-btn" hidden>Cancel</button>
+                    </div>
+                    <p id="generate-timer" class="generate-help" hidden></p>
+                    <p id="generate-slow-note" class="generate-help warn" hidden>The local model can take 10 to 15 minutes. Leave this tab open.</p>
+                    <p id="generate-status" class="generate-help" role="status" aria-live="polite">Loading providers…</p>
+
+                    <details id="generate-style-details">
+                        <summary title="A saved preamble and up to four reference images applied to every generation.">Style profile</summary>
+                        <div class="generate-field">
+                            <label for="generate-style-preamble" class="has-help" data-help-key="preamble">Preamble</label>
+                            <textarea id="generate-style-preamble" maxlength="4000" rows="6" data-help-key="preamble"></textarea>
+                            <span class="generate-counter" id="generate-style-counter">0 / 4000</span>
+                        </div>
+                        <div class="generate-field">
+                            <span class="has-help" data-help-key="references">Style references</span>
+                            <div class="generate-refs" id="generate-style-refs"></div>
+                            <button type="button" id="btn-generate-ref-add" class="small-btn">Add reference</button>
+                            <input type="file" id="generate-ref-input" accept="image/png,image/jpeg,image/webp" hidden>
+                        </div>
+                        <div class="generate-actions">
+                            <button type="button" id="btn-generate-style-save" class="small-btn" disabled>Save</button>
+                            <button type="button" id="btn-generate-style-reset" class="small-btn" disabled>Reset to default</button>
+                            <span class="generate-unsaved" id="generate-style-unsaved" hidden>Unsaved changes</span>
+                        </div>
+                        <p id="generate-style-status" class="generate-help" role="status" aria-live="polite"></p>
+                    </details>
                 </div>
             </aside>
 
