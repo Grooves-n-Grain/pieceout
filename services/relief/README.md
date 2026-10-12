@@ -62,6 +62,62 @@ RELIEF_GPU=0 RELIEF_DATA_PATH=/absolute/path/to/relief-data \
 
 The service and proxy are intended for your own trusted workshop network. If PieceOut is publicly accessible, restrict access to the whole workspace before enabling GPU requests. Job IDs provide file organization, not user authentication.
 
+## If the GPU disappears from a running service
+
+Symptom: generation gets slow, the Relief tab shows a yellow "An NVIDIA GPU is
+attached but CUDA cannot use it" notice, and `nvidia-smi` inside the container
+prints `Failed to initialize NVML: Unknown Error`. The health endpoint reports the
+same text as `gpu_warning`.
+
+This is a known NVIDIA Container Toolkit issue on hosts where Docker uses the
+systemd cgroup driver. Any `systemctl daemon-reload` (package updates and snapd
+trigger them routinely) revokes GPU access from containers that are already
+running. Restarting the container brings the GPU back:
+
+```bash
+docker compose -p pieceout-relief -f services/relief/compose.yaml restart
+```
+
+To stop it from recurring, attach the GPU through CDI instead. Docker 28.2 or
+newer has CDI enabled by default. Generate the spec once, then start the service
+with the CDI override:
+
+```bash
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+docker compose -p pieceout-relief -f services/relief/compose.yaml \
+  -f services/relief/compose.cdi.yaml up -d
+```
+
+Regenerate the spec after every NVIDIA driver update, otherwise the container
+will refuse to start. `RELIEF_GPU` keeps working as an index or UUID; check the
+available names with `nvidia-ctk cdi list`.
+
+## Sharing the GPU with other services
+
+If something else fills the GPU (a local LLM server, for example), PatchFusion
+cannot load and the job falls back to Depth Anything V2 Small on CPU. Two optional
+settings let Relief take the GPU when it needs it and give it back afterwards.
+Both are off by default.
+
+- `RELIEF_FREE_GPU_URL`: a URL the service requests when the GPU runs out of
+  memory. It then retries the GPU once and only falls back to CPU if that also
+  fails. It is never called while there is enough room. With
+  [llama-swap](https://github.com/mostlygeek/llama-swap), point it at `/unload`;
+  models reload on their next request. Be aware that this interrupts whatever
+  that service is doing at the time.
+- `RELIEF_IDLE_UNLOAD_MINUTES`: unload the depth model after this many idle
+  minutes so the other service has room to reload. The next generation loads it
+  again, which adds a few seconds. `0` keeps the model loaded.
+
+```bash
+RELIEF_FREE_GPU_URL=http://host.docker.internal:8080/unload
+RELIEF_IDLE_UNLOAD_MINUTES=10
+```
+
+Inside the container `host.docker.internal` is the Docker host. The other service
+must listen on an address the container can reach, not only on `127.0.0.1`. A job
+that needed the extra room says so next to its engine name in the Relief tab.
+
 ## Prepare a carving
 
 1. Open a PNG, JPEG, WebP or HEIC/HEIF (20 MB and 16 million pixels maximum). Camera orientation is applied automatically. Images larger than 1920 pixels on either side are reduced with their proportions preserved.

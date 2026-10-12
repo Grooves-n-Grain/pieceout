@@ -134,7 +134,8 @@ class Jobs:
                 np.save(folder / filename, depth, allow_pickle=False)
                 info = {'file': filename, 'engine': self.engine.name,
                         'device': getattr(self.engine, 'device', None),
-                        'fallback_reason': getattr(self.engine, 'fallback_reason', None)}
+                        'fallback_reason': getattr(self.engine, 'fallback_reason', None),
+                        'gpu_note': getattr(self.engine, 'gpu_note', None)}
                 cache[settings.depth_model] = info
                 self.update(job_id, depth_cache=cache)
             self.update(job_id, status='relief_processing')
@@ -148,7 +149,8 @@ class Jobs:
             staging.replace(folder / str(version))
             self.update(job_id, status='complete', version=version, error=None,
                         depth_model=settings.depth_model, engine=info['engine'],
-                        device=info['device'], fallback_reason=info['fallback_reason'])
+                        device=info['device'], fallback_reason=info['fallback_reason'],
+                        gpu_note=info.get('gpu_note'))
         except Exception as exc:
             log.exception('Relief job %s failed', job_id)
             if isinstance(exc, ValueError):

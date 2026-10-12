@@ -23,6 +23,9 @@ class TestEngine:
         self.calls = 0
         self.active = 0
         self.peak_active = 0
+        self.warning = None
+    def gpu_warning(self):
+        return self.warning
     def predict(self, image):
         self.calls += 1
         self.active += 1
@@ -66,6 +69,11 @@ class APITests(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertEqual(first, self.client.get(f'/api/relief/jobs/{job}/files/1/relief_16bit.png').content)
         self.assertEqual(self.client.get(f'/api/relief/jobs/{job}/files/0/status.json').status_code, 404)
+    def test_health_reports_a_lost_gpu(self):
+        self.assertIsNone(self.client.get('/api/relief/health').json()['gpu_warning'])
+        self.engine.warning = 'GPU lost.'
+        self.assertEqual(self.client.get('/api/relief/health').json()['gpu_warning'], 'GPU lost.')
+
     def test_jobs_serialize(self):
         jobs = [self.create() for _ in range(3)]
         for job in jobs: self.wait(job)
@@ -101,12 +109,15 @@ class APITests(unittest.TestCase):
         self.assertEqual(self.client.get(f'/api/relief/jobs/{job}/files/2/surface_preview.json').status_code, 404)
 
     def test_cached_exports_keep_original_engine_provenance(self):
+        self.engine.gpu_note = 'Made room.'
         job = self.create()
-        self.wait(job)
+        self.assertEqual(self.wait(job)['gpu_note'], 'Made room.')
         self.engine.name = 'another-resident-model'
+        self.engine.gpu_note = None
         self.client.post(f'/api/relief/jobs/{job}/relief', json={'mode': 'raised'})
         record = self.wait(job)
         self.assertEqual(record['engine'], 'test-only')
+        self.assertEqual(record['gpu_note'], 'Made room.')
         metadata = self.client.get(f"/api/relief/jobs/{job}/files/{record['version']}/metadata.json").json()
         self.assertEqual(metadata['engine'], 'test-only')
 

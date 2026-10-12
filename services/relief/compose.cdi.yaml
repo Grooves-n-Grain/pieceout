@@ -1,0 +1,12 @@
+# Attach the GPU through CDI so a systemd daemon-reload cannot revoke it.
+# Requires a generated spec first: sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+# docker compose -f compose.yaml -f compose.cdi.yaml up -d --build
+services:
+  relief:
+    deploy:
+      resources:
+        reservations:
+          devices: !override
+            - driver: cdi
+              device_ids: ["nvidia.com/gpu=${RELIEF_GPU:-0}"]
+              capabilities: [gpu]

@@ -1,5 +1,6 @@
 """Optional local relief API. Run one Uvicorn process per GPU service."""
 import json
+import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -76,7 +77,8 @@ def create_app(data_dir=None, engine=None):
 
     @app.get('/api/relief/health')
     def health():
-        return {'status': 'ready', 'engine': app.state.jobs.engine.name}
+        engine = app.state.jobs.engine
+        return {'status': 'ready', 'engine': engine.name, 'gpu_warning': engine.gpu_warning() if hasattr(engine, 'gpu_warning') else None}
 
     @app.post('/api/relief/jobs', status_code=202)
     async def create(request: Request):
@@ -140,4 +142,15 @@ def create_app(data_dir=None, engine=None):
     return app
 
 
+def configure_logging():
+    """Uvicorn only configures its own loggers; without this the service's INFO lines are dropped."""
+    package = logging.getLogger('relief')
+    if not package.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(levelname)s:     %(name)s: %(message)s'))
+        package.addHandler(handler)
+        package.setLevel(logging.INFO)
+
+
+configure_logging()
 app = create_app()

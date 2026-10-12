@@ -895,6 +895,7 @@ body.mode-relief #drop-zone { display: none !important; }
 .relief-heading { padding: 16px; border-bottom: 1px solid var(--border); }
 .relief-heading h2 { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
 .relief-heading p, .relief-help { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.relief-help.warn { color: var(--warn); }
 #relief-form { padding: 12px 16px; overflow-y: auto; }
 #relief-source-name { margin: 8px 0 14px; overflow-wrap: anywhere; }
 #relief-settings fieldset { border: 0; padding: 12px 0; border-bottom: 1px solid var(--border); }

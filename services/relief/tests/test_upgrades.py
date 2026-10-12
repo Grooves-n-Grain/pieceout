@@ -48,18 +48,26 @@ class SurfaceTests(unittest.TestCase):
 
 
 class EngineTests(unittest.TestCase):
-    def manager(self, cuda=True, oom=False):
+    def manager(self, cuda=True, oom=False, gpu_attached=False, oom_first=0, free_gpu=lambda: False, idle_seconds=0):
         from relief.engines.manager import EngineManager
         self.engines = []
+        self.timers = []
         def factory(model, device):
             engine = Mock(name=model)
             engine.name = model
             engine.predict.return_value = np.arange(1, 5, dtype=np.float32).reshape(2, 2)
-            if oom and device == 'cuda':
+            gpu_engines = sum(1 for _, used, _ in self.engines if used == 'cuda')
+            if device == 'cuda' and (oom or gpu_engines < oom_first):
                 engine.predict.side_effect = RuntimeError('CUDA out of memory')
             self.engines.append((model, device, engine))
             return engine
-        return EngineManager(factory=factory, cuda_available=lambda: cuda, release_memory=lambda: None)
+        def timer(seconds, callback, args=()):
+            handle = Mock(seconds=seconds, fire=lambda: callback(*args))
+            self.timers.append(handle)
+            return handle
+        return EngineManager(factory=factory, cuda_available=lambda: cuda, release_memory=lambda: None,
+                             gpu_attached=lambda: gpu_attached, free_gpu=free_gpu,
+                             idle_seconds=idle_seconds, timer=timer)
 
     def test_gpu_first_and_cpu_only_as_fallback(self):
         manager = self.manager()
@@ -72,12 +80,65 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.engines[0][:2], ('depth-anything-v2-small', 'cpu'))
         self.assertIsNotNone(manager.fallback_reason)
 
+    def test_attached_gpu_without_cuda_is_reported_not_hidden(self):
+        manager = self.manager(cuda=False, gpu_attached=True)
+        self.assertIn('Restart the relief service', manager.gpu_warning())
+        manager.predict(None, 'patchfusion-vitb')
+        self.assertEqual(manager.device, 'cpu')
+        self.assertIn('Restart the relief service', manager.fallback_reason)
+        self.assertIsNone(self.manager(cuda=False).gpu_warning())
+        self.assertIsNone(self.manager(cuda=True, gpu_attached=True).gpu_warning())
+
     def test_oom_unloads_gpu_and_retries_small_cpu(self):
         manager = self.manager(oom=True)
         manager.predict(None, 'patchfusion-vitb')
         self.engines[0][2].unload.assert_called_once()
         self.assertEqual(self.engines[1][:2], ('depth-anything-v2-small', 'cpu'))
         self.assertEqual(manager.device, 'cpu')
+
+    def test_oom_asks_other_services_to_unload_then_retries_gpu(self):
+        asked = []
+        manager = self.manager(oom_first=1, free_gpu=lambda: asked.append(1) or True)
+        manager.predict(None, 'patchfusion-vitb')
+        self.assertEqual(asked, [1])
+        self.engines[0][2].unload.assert_called_once()
+        self.assertEqual(self.engines[1][:2], ('patchfusion-vitb', 'cuda'))
+        self.assertEqual((manager.name, manager.device), ('patchfusion-vitb', 'cuda'))
+        self.assertIsNone(manager.fallback_reason)
+        self.assertIn('unload', manager.gpu_note)
+        manager.predict(None, 'patchfusion-vitb')
+        self.assertEqual(asked, [1])
+        self.assertIsNone(manager.gpu_note)
+
+    def test_oom_after_freeing_gpu_still_falls_back_to_cpu(self):
+        manager = self.manager(oom=True, free_gpu=lambda: True)
+        manager.predict(None, 'patchfusion-vitb')
+        self.assertEqual([used for _, used, _ in self.engines], ['cuda', 'cuda', 'cpu'])
+        self.assertEqual(manager.device, 'cpu')
+        self.assertIn('still insufficient', manager.fallback_reason)
+        self.assertIsNone(manager.gpu_note)
+
+    def test_idle_model_unloads_and_reloads_on_demand(self):
+        manager = self.manager(idle_seconds=600)
+        manager.predict(None, 'patchfusion-vitb')
+        self.assertEqual(self.timers[-1].seconds, 600)
+        self.timers[-1].start.assert_called_once()
+        self.timers[-1].fire()
+        self.engines[0][2].unload.assert_called_once()
+        self.assertIsNone(manager.active)
+        manager.predict(None, 'patchfusion-vitb')
+        self.assertEqual(len(self.engines), 2)
+
+    def test_stale_idle_timer_never_unloads_a_model_in_use(self):
+        manager = self.manager(idle_seconds=600)
+        manager.predict(None, 'patchfusion-vitb')
+        stale = self.timers[-1]
+        manager.predict(None, 'patchfusion-vitb')
+        stale.cancel.assert_called_once()
+        stale.fire()
+        self.engines[0][2].unload.assert_not_called()
+        self.assertEqual(self.manager().predict(None).shape, (2, 2))
+        self.assertEqual(self.timers, [])
 
     def test_unrelated_failure_is_not_hidden_by_fallback(self):
         manager = self.manager()

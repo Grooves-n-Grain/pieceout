@@ -47,6 +47,7 @@ export function initRelief({ canvas, isActive }) {
     });
     let source = null, mask = null, sourceURL = '', width = 0, height = 0;
     let job = null, connected = false, busy = false, dirty = false, needsFit = true;
+    let gpuWarning = null;
     let maskDirty = false, selection = 0;
     let epoch = 0, polling = null, debounce = null, checking = false;
     // Tracks whichever units the width/depth inputs are currently displayed in, so a units
@@ -132,8 +133,10 @@ export function initRelief({ canvas, isActive }) {
         $('relief-mode-help').textContent = raised
             ? 'Near features stay high above a carved pocket. Protected areas stay at the stock face. Increase Background limit to include more surrounding material in the pocket.'
             : 'Near features become deeper impressions. Protected areas stay at the stock face.';
-        $('relief-engine-status').textContent = job?.fallback_reason || (job?.device
-            ? `${job.engine === 'patchfusion-vitb' ? 'PatchFusion' : 'Depth Anything V2 Small'} · ${job.device === 'cuda' ? 'GPU' : 'CPU'}`
+        const engineStatus = $('relief-engine-status');
+        engineStatus.classList.toggle('warn', Boolean(gpuWarning));
+        engineStatus.textContent = gpuWarning || job?.fallback_reason || (job?.device
+            ? `${job.engine === 'patchfusion-vitb' ? 'PatchFusion' : 'Depth Anything V2 Small'} · ${job.device === 'cuda' ? 'GPU' : 'CPU'}${job.gpu_note ? ` · ${job.gpu_note}` : ''}`
             : 'GPU preferred · CPU fallback if CUDA is unavailable or memory is insufficient.');
         $('relief-preview-note').textContent = dirty || busy ? 'Showing the last completed relief while settings update.' : '';
         maskInput.disabled = busy || !source;
@@ -200,9 +203,10 @@ export function initRelief({ canvas, isActive }) {
         checking = true;
         const token = epoch;
         try {
-            await api.health();
+            const service = await api.health();
             if (token !== epoch) return;
             connected = true;
+            gpuWarning = service?.gpu_warning || null;
             if (!job && !source && saved()) {
                 try {
                     const restored = await api.getJob(saved());
